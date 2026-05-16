@@ -1,129 +1,84 @@
 package com.train.app.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.train.app.data.FirebaseManager
+import com.train.app.data.models.*
 import com.train.app.ui.components.*
 import com.train.app.ui.theme.*
 
 @Composable
-fun RoutinesScreen() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark)
-            .padding(horizontal = 20.dp, vertical = 24.dp)
-    ) {
-        Text(
-            text = "ROUTINES",
-            style = AppTypography.headlineLarge,
-            color = TextPrimary
-        )
+fun RoutinesScreen(onStartWorkout: (Routine) -> Unit) {
+    var routines by remember { mutableStateOf<List<Routine>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    val userId = FirebaseManager.auth.currentUser?.uid
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Cabeçalho / Ações
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            TrainSecondaryButton(
-                text = "IMPORT / EXPORT",
-                onClick = { /* TODO */ },
-                modifier = Modifier.weight(1f)
-            )
-            TrainPrimaryButton(
-                text = "CREATE",
-                onClick = { /* TODO */ },
-                modifier = Modifier.weight(1f)
-            )
+    // Escuta em tempo real as rotinas do utilizador
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            FirebaseManager.firestore.collection("users").document(userId).collection("routines")
+                .addSnapshotListener { snapshot, _ ->
+                    if (snapshot != null) {
+                        routines = snapshot.toObjects(Routine::class.java)
+                        isLoading = false
+                    }
+                }
         }
+    }
 
-        Spacer(modifier = Modifier.height(24.dp))
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Text("AS TUAS ROTINAS", style = AppTypography.headlineLarge)
+        Spacer(Modifier.height(16.dp))
 
-        // Lista de Rotinas
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(5) { index ->
-                RoutineCardItem(index)
+        if (isLoading) {
+            CircularProgressIndicator(color = AccentBlue)
+        } else if (routines.isEmpty()) {
+            Text("Ainda não tens rotinas criadas.", color = OutlineBorder)
+            // Botão temporário para criar uma rotina de teste se a lista estiver vazia
+            TrainSecondaryButton("CRIAR ROTINA DE TESTE", onClick = { createMockRoutine(userId!!) })
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(routines) { routine ->
+                    RoutineCard(routine, onStartWorkout)
+                }
             }
         }
     }
 }
 
 @Composable
-fun RoutineCardItem(index: Int) {
-    val title = if (index % 2 == 0) "Push Day Heavy" else "Legs Volume"
-    val tag = if (index % 2 == 0) "Strength" else "Hypertrophy"
-    val isWarning = index % 2 == 0
-
-    TrainCard(modifier = Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Header do Cartão
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title,
-                    style = AppTypography.headlineLarge,
-                    color = TextPrimary
-                )
-                TrainChip(text = tag, isWarning = isWarning)
+fun RoutineCard(routine: Routine, onStartWorkout: (Routine) -> Unit) {
+    TrainCard {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(routine.name, style = AppTypography.headlineLarge.copy(fontSize = 20.sp))
+                TrainChip(routine.focus)
             }
-
-            // Métricas (Exercícios e Tempo)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.FitnessCenter,
-                        contentDescription = "Exercises",
-                        tint = OutlineBorder,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "6 EXERCISES",
-                        style = AppTypography.labelMedium,
-                        color = TextPrimary
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Schedule,
-                        contentDescription = "Duration",
-                        tint = OutlineBorder,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "~45 MIN",
-                        style = AppTypography.labelMedium,
-                        color = TextPrimary
-                    )
-                }
-            }
-
-            // Texto Auxiliar
-            Text(
-                text = "Last trained: 2 days ago",
-                style = AppTypography.bodyLarge,
-                color = OutlineBorder
-            )
+            Spacer(Modifier.height(8.dp))
+            Text("${routine.exercises.size} Exercícios", style = AppTypography.bodyLarge, color = OutlineBorder)
+            Spacer(Modifier.height(16.dp))
+            TrainPrimaryButton("COMEÇAR TREINO", onClick = { onStartWorkout(routine) }, modifier = Modifier.fillMaxWidth())
         }
     }
+}
+
+// Função auxiliar para não ficares com o ecrã vazio no primeiro teste
+fun createMockRoutine(userId: String) {
+    val mockRoutine = Routine(
+        id = "mock_1",
+        userId = userId,
+        name = "Treino de Peito",
+        focus = "Força",
+        exercises = listOf(
+            Exercise(id = "ex_1", name = "Supino Reto", sets = listOf(WorkoutSet(reps = 10, weight = 60f), WorkoutSet(reps = 10, weight = 60f))),
+            Exercise(id = "ex_2", name = "Press inclinado", sets = listOf(WorkoutSet(reps = 12, weight = 20f)))
+        )
+    )
+    FirebaseManager.firestore.collection("users").document(userId).collection("routines").document(mockRoutine.id).set(mockRoutine)
 }
