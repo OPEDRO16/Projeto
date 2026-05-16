@@ -2,17 +2,39 @@ package com.train.app.ui.screens
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.*
-import com.train.app.navigation.Screen
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.google.firebase.auth.FirebaseAuth
 import com.train.app.data.FirebaseManager
-import com.train.app.ui.theme.*
 import com.train.app.data.models.Routine
+import com.train.app.navigation.Screen
+import com.train.app.ui.theme.AccentBlue
+import com.train.app.ui.theme.BackgroundDark
+import com.train.app.ui.theme.OutlineBorder
+import com.train.app.ui.theme.SurfaceLevel1
 
 @Composable
 fun MainScreen() {
@@ -20,18 +42,19 @@ fun MainScreen() {
     var activeWorkoutRoutine by remember { mutableStateOf<Routine?>(null) }
     var currentUser by remember { mutableStateOf(FirebaseManager.auth.currentUser) }
 
-    // Sincronização do estado de autenticação para redirecionamento e UI
     DisposableEffect(Unit) {
-        val listener = { auth: com.google.firebase.auth.FirebaseAuth ->
+        val listener = FirebaseAuth.AuthStateListener { auth ->
             currentUser = auth.currentUser
         }
         FirebaseManager.auth.addAuthStateListener(listener)
-        onDispose { FirebaseManager.auth.removeAuthStateListener(listener) }
+        onDispose {
+            FirebaseManager.auth.removeAuthStateListener(listener)
+        }
     }
 
-    // Monitorização global do Logout
     LaunchedEffect(currentUser) {
         if (currentUser == null) {
+            activeWorkoutRoutine = null
             navController.navigate(Screen.Login.route) {
                 popUpTo(0) { inclusive = true }
                 launchSingleTop = true
@@ -44,11 +67,12 @@ fun MainScreen() {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
 
-            // Oculta a barra de navegação no Login, no Editor e durante o Treino Ativo
-            if (currentUser != null &&
+            if (
+                currentUser != null &&
                 currentRoute != Screen.Login.route &&
                 currentRoute != Screen.RoutineEditor.route &&
-                activeWorkoutRoutine == null) {
+                activeWorkoutRoutine == null
+            ) {
                 BottomNavBar(navController)
             }
         },
@@ -63,6 +87,7 @@ fun MainScreen() {
                 LoginScreen {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             }
@@ -75,16 +100,15 @@ fun MainScreen() {
                 )
             }
             composable(Screen.RoutineEditor.route) {
-                RoutineEditorScreen(onSaveComplete = {
-                    navController.popBackStack()
-                })
+                RoutineEditorScreen(
+                    onSaveComplete = { navController.popBackStack() }
+                )
             }
             composable(Screen.Evolution.route) { EvolutionScreen() }
             composable(Screen.Chat.route) { ChatScreen() }
             composable(Screen.Profile.route) { ProfileScreen() }
         }
 
-        // Overlay do Workout Tracker (HUD de Performance)
         activeWorkoutRoutine?.let { routine ->
             WorkoutTrackerScreen(
                 routine = routine,
@@ -107,9 +131,10 @@ fun BottomNavBar(navController: NavHostController) {
     NavigationBar(containerColor = SurfaceLevel1) {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
+
         items.forEach { item ->
             NavigationBarItem(
-                icon = { Icon(item.icon, item.title) },
+                icon = { Icon(item.icon, contentDescription = item.title) },
                 label = { Text(item.title) },
                 selected = currentRoute == item.route,
                 onClick = {
