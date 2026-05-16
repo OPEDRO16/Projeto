@@ -3,6 +3,7 @@ package com.train.app.viewmodels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -18,6 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 class WorkoutViewModel : ViewModel() {
@@ -30,6 +32,19 @@ class WorkoutViewModel : ViewModel() {
         val weight: Float = 0f,
         val reps: Int = 0,
         val completed: Boolean = false
+    )
+
+    data class PrNotification(
+        val id: String = UUID.randomUUID().toString(),
+        val exerciseName: String,
+        val labels: List<String>
+    )
+
+    private data class ExercisePrBaseline(
+        val heaviestWeight: Float = 0f,
+        val bestReps: Int = 0,
+        val bestSetVolume: Float = 0f,
+        val bestOneRepMax: Float = 0f
     )
 
     var activeRoutine by mutableStateOf<Routine?>(null)
@@ -57,6 +72,9 @@ class WorkoutViewModel : ViewModel() {
         private set
 
     val previousExerciseValues = mutableStateMapOf<String, List<PreviousSetValue>>()
+    val livePrNotifications = mutableStateListOf<PrNotification>()
+
+    private val exercisePrBaselines = mutableStateMapOf<String, ExercisePrBaseline>()
 
     private var startTime by mutableLongStateOf(0L)
     private var timerJob: Job? = null
@@ -70,6 +88,8 @@ class WorkoutViewModel : ViewModel() {
         elapsedTime = 0L
         isRunning = true
         previousExerciseValues.clear()
+        exercisePrBaselines.clear()
+        livePrNotifications.clear()
 
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
@@ -80,6 +100,7 @@ class WorkoutViewModel : ViewModel() {
         }
 
         loadPreviousValues(routine)
+        loadPrBaselines(routine)
     }
 
     suspend fun runTimer() {
@@ -93,6 +114,10 @@ class WorkoutViewModel : ViewModel() {
 
     fun toggleAutoCopyLastSet() {
         autoCopyLastSet = !autoCopyLastSet
+    }
+
+    fun consumePrNotification(id: String) {
+        livePrNotifications.removeAll { it.id == id }
     }
 
     private fun loadPreviousValues(routine: Routine) {
@@ -124,6 +149,42 @@ class WorkoutViewModel : ViewModel() {
             .addOnFailureListener {
                 isLoadingPreviousValues = false
             }
+    }
+
+    private fun loadPrBaselines(routine: Routine) {
+        val userId = FirebaseManager.auth.currentUser?.uid ?: return
+
+        FirebaseManager.firestore
+            .collection("users")
+            .document(userId)
+            .collection("sessions")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val sessions = snapshot.toObjects(WorkoutSession::class.java)
+                routine.exercises.forEach { exercise ->
+                    exercisePrBaselines[exercise.id] = calculateBaselineForExercise(exercise, sessions)
+                }
+            }
+    }
+
+    private fun calculateBaselineForExercise(exercise: Exercise, sessions: List<WorkoutSession>): ExercisePrBaseline {
+        val historySets = sessions
+            .flatMap { session -> session.exercises }
+            .filter { it.name.equals(exercise.name, ignoreCase = true) }
+            .flatMap { it.sets }
+            .filter { it.completed }
+
+        val heaviestWeight = historySets.maxOfOrNull { it.weight } ?: 0f
+        val bestReps = historySets.maxOfOrNull { it.reps } ?: 0
+        val bestSetVolume = historySets.maxOfOrNull { it.weight * it.reps } ?: 0f
+        val bestOneRepMax = historySets.maxOfOrNull { estimateOneRepMax(it.weight, it.reps) } ?: 0f
+
+        return ExercisePrBaseline(
+            heaviestWeight = heaviestWeight,
+            bestReps = bestReps,
+            bestSetVolume = bestSetVolume,
+            bestOneRepMax = bestOneRepMax
+        )
     }
 
     private fun findPreviousExercise(
@@ -243,11 +304,14 @@ class WorkoutViewModel : ViewModel() {
 
     fun toggleSet(exerciseId: String, setIndex: Int) {
         val routine = activeRoutine ?: return
+        var exerciseName = ""
+        var prLabels = emptyList<String>()
 
         val updatedExercises = routine.exercises.map { exercise ->
             if (exercise.id != exerciseId) return@map exercise
             if (setIndex !in exercise.sets.indices) return@map exercise
 
+            exerciseName = exercise.name.ifBlank { "Exercise" }
             val updatedSets = exercise.sets.toMutableList()
             val currentSet = updatedSets[setIndex]
             val newCompletedState = !currentSet.completed
@@ -256,6 +320,8 @@ class WorkoutViewModel : ViewModel() {
             updatedSets[setIndex] = currentSet.copy(completed = newCompletedState)
 
             if (newCompletedState) {
+                prLabels = evaluatePrs(exercise.id, updatedSets[setIndex])
+
                 if (nextSet?.type == SetType.DROPSET) {
                     stopRestTimer()
                 } else {
@@ -267,9 +333,43 @@ class WorkoutViewModel : ViewModel() {
         }
 
         activeRoutine = routine.copy(exercises = updatedExercises)
+
+        if (prLabels.isNotEmpty()) {
+            livePrNotifications.add(
+                PrNotification(
+                    exerciseName = exerciseName,
+                    labels = prLabels
+                )
+            )
+        }
     }
 
-    fun finishWorkout(onComplete: () -> Unit) {
+    private fun evaluatePrs(exerciseId: String, completedSet: WorkoutSet): List<String> {
+        val baseline = exercisePrBaselines[exerciseId] ?: ExercisePrBaseline()
+        val labels = mutableListOf<String>()
+
+        if (completedSet.weight > baseline.heaviestWeight) labels.add("Heaviest Weight")
+        if (completedSet.reps > baseline.bestReps) labels.add("Most Reps")
+
+        val setVolume = completedSet.weight * completedSet.reps
+        if (setVolume > baseline.bestSetVolume) labels.add("Best Set Volume")
+
+        val oneRepMax = estimateOneRepMax(completedSet.weight, completedSet.reps)
+        if (oneRepMax > baseline.bestOneRepMax) labels.add("Best 1RM")
+
+        if (labels.isNotEmpty()) {
+            exercisePrBaselines[exerciseId] = ExercisePrBaseline(
+                heaviestWeight = maxOf(baseline.heaviestWeight, completedSet.weight),
+                bestReps = maxOf(baseline.bestReps, completedSet.reps),
+                bestSetVolume = maxOf(baseline.bestSetVolume, setVolume),
+                bestOneRepMax = maxOf(baseline.bestOneRepMax, oneRepMax)
+            )
+        }
+
+        return labels
+    }
+
+    fun finishWorkout(onComplete: (String) -> Unit) {
         val routine = activeRoutine ?: return
         val userId = FirebaseManager.auth.currentUser?.uid ?: return
 
@@ -306,13 +406,18 @@ class WorkoutViewModel : ViewModel() {
             .addOnSuccessListener {
                 isSaving = false
                 resetWorkoutState()
-                onComplete()
+                onComplete(session.id)
             }
             .addOnFailureListener {
                 isSaving = false
                 activeRoutine = routine
                 isRunning = false
             }
+    }
+
+    private fun estimateOneRepMax(weight: Float, reps: Int): Float {
+        if (weight <= 0f || reps <= 0) return 0f
+        return weight * (1f + reps / 30f)
     }
 
     private fun resetWorkoutState() {
@@ -323,6 +428,8 @@ class WorkoutViewModel : ViewModel() {
         restTimeLeft = 0
         isLoadingPreviousValues = false
         previousExerciseValues.clear()
+        exercisePrBaselines.clear()
+        livePrNotifications.clear()
     }
 
     override fun onCleared() {

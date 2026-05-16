@@ -17,21 +17,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,6 +52,7 @@ import com.train.app.data.models.SetType
 import com.train.app.ui.components.TrainCard
 import com.train.app.ui.components.TrainPrimaryButton
 import com.train.app.ui.theme.AccentBlue
+import com.train.app.ui.theme.AccentPurple
 import com.train.app.ui.theme.AccentYellow
 import com.train.app.ui.theme.AppTypography
 import com.train.app.ui.theme.BackgroundDark
@@ -61,9 +65,11 @@ import com.train.app.viewmodels.WorkoutViewModel
 @Composable
 fun WorkoutTrackerScreen(
     routine: Routine,
-    onFinish: () -> Unit,
+    onFinish: (String) -> Unit,
     workoutViewModel: WorkoutViewModel = viewModel()
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
     LaunchedEffect(routine.id) {
         workoutViewModel.startWorkout(routine)
     }
@@ -74,145 +80,192 @@ fun WorkoutTrackerScreen(
         }
     }
 
-    Column(
+    LaunchedEffect(workoutViewModel.livePrNotifications.size) {
+        val notification = workoutViewModel.livePrNotifications.firstOrNull() ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(
+            message = "PR em ${notification.exerciseName}: ${notification.labels.joinToString()}"
+        )
+        workoutViewModel.consumePrNotification(notification.id)
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundDark)
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = SurfaceLevel1
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = routine.name.uppercase(),
-                            style = AppTypography.labelMedium,
-                            color = AccentBlue
-                        )
-                        Text(
-                            text = workoutViewModel.formatTime(workoutViewModel.elapsedTime),
-                            style = AppTypography.displayLarge.copy(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 34.sp
-                            )
-                        )
-                    }
-
-                    if (workoutViewModel.isSaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(28.dp),
-                            color = AccentBlue
-                        )
-                    } else {
-                        TrainPrimaryButton(
-                            text = "CONCLUIR",
-                            onClick = { workoutViewModel.finishWorkout(onFinish) }
-                        )
-                    }
-                }
-
-                AnimatedVisibility(visible = workoutViewModel.restTimeLeft > 0) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = SurfaceLevel1
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Row(
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .background(
-                                color = AccentBlue.copy(alpha = 0.12f),
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = AccentBlue,
-                            modifier = Modifier.size(16.dp)
+                        Column {
+                            Text(
+                                text = routine.name.uppercase(),
+                                style = AppTypography.labelMedium,
+                                color = AccentBlue
+                            )
+                            Text(
+                                text = workoutViewModel.formatTime(workoutViewModel.elapsedTime),
+                                style = AppTypography.displayLarge.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 34.sp
+                                )
+                            )
+                        }
+
+                        if (workoutViewModel.isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                color = AccentBlue
+                            )
+                        } else {
+                            TrainPrimaryButton(
+                                text = "CONCLUIR",
+                                onClick = { workoutViewModel.finishWorkout(onFinish) }
+                            )
+                        }
+                    }
+
+                    AnimatedVisibility(visible = workoutViewModel.restTimeLeft > 0) {
+                        Row(
+                            modifier = Modifier
+                                .padding(top = 12.dp)
+                                .background(
+                                    color = AccentBlue.copy(alpha = 0.12f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Timer,
+                                contentDescription = null,
+                                tint = AccentBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "DESCANSO: ${workoutViewModel.restTimeLeft}s",
+                                style = AppTypography.labelMedium,
+                                color = AccentBlue
+                            )
+                        }
+                    }
+
+                    if (workoutViewModel.livePrNotifications.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        val pr = workoutViewModel.livePrNotifications.first()
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = AccentPurple.copy(alpha = 0.16f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.EmojiEvents,
+                                    contentDescription = null,
+                                    tint = AccentYellow,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Novo PR em ${pr.exerciseName}: ${pr.labels.joinToString()}",
+                                    style = AppTypography.bodyMedium,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TrackerSettingChip(
+                            text = if (workoutViewModel.previousValuesMode == WorkoutViewModel.PreviousValuesMode.ANY_WORKOUT)
+                                "Previous: Any workout" else "Previous: Same routine",
+                            isActive = true,
+                            onClick = {
+                                val newMode = if (workoutViewModel.previousValuesMode == WorkoutViewModel.PreviousValuesMode.ANY_WORKOUT) {
+                                    WorkoutViewModel.PreviousValuesMode.SAME_ROUTINE
+                                } else {
+                                    WorkoutViewModel.PreviousValuesMode.ANY_WORKOUT
+                                }
+                                workoutViewModel.updatePreviousValuesMode(newMode)
+                            },
+                            modifier = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+
+                        TrackerSettingChip(
+                            text = if (workoutViewModel.autoCopyLastSet) "Add set: Copy last" else "Add set: Empty",
+                            isActive = workoutViewModel.autoCopyLastSet,
+                            onClick = { workoutViewModel.toggleAutoCopyLastSet() },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    AnimatedVisibility(visible = workoutViewModel.isLoadingPreviousValues) {
                         Text(
-                            text = "DESCANSO: ${workoutViewModel.restTimeLeft}s",
-                            style = AppTypography.labelMedium,
-                            color = AccentBlue
+                            text = "A carregar previous values...",
+                            modifier = Modifier.padding(top = 10.dp),
+                            style = AppTypography.labelSmall,
+                            color = OutlineBorder
                         )
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TrackerSettingChip(
-                        text = if (workoutViewModel.previousValuesMode == WorkoutViewModel.PreviousValuesMode.ANY_WORKOUT)
-                            "Previous: Any workout" else "Previous: Same routine",
-                        isActive = true,
-                        onClick = {
-                            val newMode = if (workoutViewModel.previousValuesMode == WorkoutViewModel.PreviousValuesMode.ANY_WORKOUT) {
-                                WorkoutViewModel.PreviousValuesMode.SAME_ROUTINE
-                            } else {
-                                WorkoutViewModel.PreviousValuesMode.ANY_WORKOUT
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                val activeRoutine = workoutViewModel.activeRoutine
+                if (activeRoutine != null) {
+                    items(activeRoutine.exercises.size) { index ->
+                        val exercise = activeRoutine.exercises[index]
+                        ExerciseActiveCard(
+                            exercise = exercise,
+                            workoutViewModel = workoutViewModel,
+                            onUpdateSet = { setIndex, weight, reps ->
+                                workoutViewModel.updateSet(exercise.id, setIndex, weight, reps)
+                            },
+                            onUpdateSetType = { setIndex, type ->
+                                workoutViewModel.updateSetType(exercise.id, setIndex, type)
+                            },
+                            onToggleSet = { setIndex ->
+                                workoutViewModel.toggleSet(exercise.id, setIndex)
+                            },
+                            onApplyPrevious = { setIndex ->
+                                workoutViewModel.applyPreviousSetValue(exercise.id, setIndex)
+                            },
+                            onAddSet = {
+                                workoutViewModel.addSet(exercise.id)
                             }
-                            workoutViewModel.updatePreviousValuesMode(newMode)
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    TrackerSettingChip(
-                        text = if (workoutViewModel.autoCopyLastSet) "Add set: Copy last" else "Add set: Empty",
-                        isActive = workoutViewModel.autoCopyLastSet,
-                        onClick = { workoutViewModel.toggleAutoCopyLastSet() },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                AnimatedVisibility(visible = workoutViewModel.isLoadingPreviousValues) {
-                    Text(
-                        text = "A carregar previous values...",
-                        modifier = Modifier.padding(top = 10.dp),
-                        style = AppTypography.labelSmall,
-                        color = OutlineBorder
-                    )
+                        )
+                    }
                 }
             }
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            val activeRoutine = workoutViewModel.activeRoutine
-            if (activeRoutine != null) {
-                itemsIndexed(activeRoutine.exercises) { _, exercise ->
-                    ExerciseActiveCard(
-                        exercise = exercise,
-                        workoutViewModel = workoutViewModel,
-                        onUpdateSet = { setIndex, weight, reps ->
-                            workoutViewModel.updateSet(exercise.id, setIndex, weight, reps)
-                        },
-                        onUpdateSetType = { setIndex, type ->
-                            workoutViewModel.updateSetType(exercise.id, setIndex, type)
-                        },
-                        onToggleSet = { setIndex ->
-                            workoutViewModel.toggleSet(exercise.id, setIndex)
-                        },
-                        onApplyPrevious = { setIndex ->
-                            workoutViewModel.applyPreviousSetValue(exercise.id, setIndex)
-                        },
-                        onAddSet = {
-                            workoutViewModel.addSet(exercise.id)
-                        }
-                    )
-                }
-            }
-        }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        )
     }
 }
 
