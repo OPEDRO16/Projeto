@@ -112,6 +112,9 @@ fun MainScreen() {
                 ProfileScreen(
                     onOpenWorkoutDetail = { sessionId ->
                         navController.navigate(Screen.WorkoutDetail.createRoute(sessionId))
+                    },
+                    onOpenCalendar = {
+                        navController.navigate("workout_calendar")
                     }
                 )
             }
@@ -121,6 +124,15 @@ fun MainScreen() {
             composable("routine_editor") {
                 RoutineEditorScreen(
                     onSaveComplete = { navController.popBackStack() }
+                )
+            }
+
+            composable("workout_calendar") {
+                WorkoutCalendarScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenWorkoutDetail = { sessionId ->
+                        navController.navigate(Screen.WorkoutDetail.createRoute(sessionId))
+                    }
                 )
             }
 

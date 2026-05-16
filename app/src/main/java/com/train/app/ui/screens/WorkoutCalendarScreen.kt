@@ -13,8 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
@@ -30,17 +31,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.train.app.data.FirebaseManager
 import com.train.app.data.models.WorkoutSession
-import com.train.app.ui.components.TrainCard
-import com.train.app.ui.components.TrainSecondaryButton
 import com.train.app.ui.theme.AccentBlue
+import com.train.app.ui.theme.AccentPurple
 import com.train.app.ui.theme.AccentYellow
 import com.train.app.ui.theme.AppTypography
 import com.train.app.ui.theme.BackgroundDark
 import com.train.app.ui.theme.OutlineBorder
+import com.train.app.ui.theme.SurfaceLevel0
 import com.train.app.ui.theme.SurfaceLevel1
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -98,17 +100,32 @@ fun WorkoutCalendarScreen(
         item {
             Text("CALENDÁRIO", style = AppTypography.headlineLarge)
             Spacer(modifier = Modifier.height(12.dp))
-            TrainSecondaryButton(
-                text = "VOLTAR AO PERFIL",
-                onClick = onBack,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onBack() },
+                shape = RoundedCornerShape(10.dp),
+                color = AccentPurple.copy(alpha = 0.16f)
+            ) {
+                Text(
+                    text = "VOLTAR AO PERFIL",
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                    style = AppTypography.labelSmall,
+                    color = AccentPurple,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         when {
             isLoading -> {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         CircularProgressIndicator(color = AccentBlue)
                     }
                 }
@@ -116,16 +133,27 @@ fun WorkoutCalendarScreen(
 
             errorMessage != null -> {
                 item {
-                    TrainCard {
-                        Text(errorMessage!!, color = AccentYellow)
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = SurfaceLevel0
+                    ) {
+                        Text(
+                            text = errorMessage ?: "Erro",
+                            modifier = Modifier.padding(14.dp),
+                            color = AccentYellow,
+                            style = AppTypography.bodyMedium
+                        )
                     }
                 }
             }
 
             else -> {
                 item {
-                    TrainCard {
-                        Column {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = SurfaceLevel0
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
                             Text(
                                 text = SimpleDateFormat("MMMM yyyy", Locale("pt", "PT")).format(Date()).replaceFirstChar {
                                     if (it.isLowerCase()) it.titlecase(Locale("pt", "PT")) else it.toString()
@@ -150,12 +178,20 @@ fun WorkoutCalendarScreen(
 
                 if (selectedSessions.isEmpty()) {
                     item {
-                        TrainCard {
-                            Text("Nenhum treino neste dia.", color = OutlineBorder)
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = SurfaceLevel0
+                        ) {
+                            Text(
+                                text = "Nenhum treino neste dia.",
+                                modifier = Modifier.padding(14.dp),
+                                color = OutlineBorder,
+                                style = AppTypography.bodyMedium
+                            )
                         }
                     }
                 } else {
-                    items(selectedSessions) { session ->
+                    itemsIndexed(selectedSessions) { _, session ->
                         CalendarWorkoutCard(
                             session = session,
                             onClick = { onOpenWorkoutDetail(session.id) }
@@ -236,8 +272,14 @@ private fun CalendarWorkoutCard(
         exercise.sets.count { it.completed }
     }
 
-    TrainCard(modifier = Modifier.clickable { onClick() }) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        color = SurfaceLevel0
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
