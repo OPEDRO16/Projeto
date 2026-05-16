@@ -35,7 +35,6 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-// --- MODELO DE SESSÃO ---
 data class WorkoutSession(
     val id: String = UUID.randomUUID().toString(),
     val routineId: String = "",
@@ -46,7 +45,6 @@ data class WorkoutSession(
     val exercises: List<Exercise> = emptyList()
 )
 
-// --- VIEWMODEL DO TREINO ---
 class WorkoutViewModel : ViewModel() {
     var activeRoutine by mutableStateOf<Routine?>(null)
     var elapsedTime by mutableLongStateOf(0L)
@@ -75,10 +73,7 @@ class WorkoutViewModel : ViewModel() {
         restTimerJob?.cancel()
         restTimeLeft = seconds
         restTimerJob = viewModelScope.launch {
-            while (restTimeLeft > 0) {
-                delay(1000)
-                restTimeLeft--
-            }
+            while (restTimeLeft > 0) { delay(1000); restTimeLeft-- }
         }
     }
 
@@ -126,13 +121,12 @@ class WorkoutViewModel : ViewModel() {
     fun finishWorkout(onComplete: () -> Unit) {
         val routine = activeRoutine ?: return
         val userId = FirebaseManager.auth.currentUser?.uid ?: return
-
         isSaving = true
         isRunning = false
         val endTime = System.currentTimeMillis()
         val duration = TimeUnit.MILLISECONDS.toMinutes(elapsedTime).toInt()
 
-        // Correção: Parâmetros nomeados para resolver o erro de "Argument type mismatch"
+        // Uso de parâmetros nomeados para evitar erros de tipo posicional
         val session = WorkoutSession(
             routineId = routine.id,
             routineName = routine.name,
@@ -143,94 +137,41 @@ class WorkoutViewModel : ViewModel() {
         )
 
         viewModelScope.launch {
-            FirebaseManager.firestore
-                .collection("users")
-                .document(userId)
-                .collection("sessions")
-                .document(session.id)
-                .set(session)
-                .addOnSuccessListener {
-                    isSaving = false
-                    onComplete()
-                }
-                .addOnFailureListener {
-                    isSaving = false
-                }
+            FirebaseManager.firestore.collection("users").document(userId).collection("sessions").document(session.id).set(session)
+                .addOnSuccessListener { isSaving = false; onComplete() }
         }
     }
 }
 
-// --- ECRÃ PRINCIPAL ---
 @Composable
 fun WorkoutTrackerScreen(routine: Routine, onFinish: () -> Unit) {
     val vm: WorkoutViewModel = viewModel()
-
-    LaunchedEffect(routine) {
-        vm.startWorkout(routine)
-    }
-
-    LaunchedEffect(vm.isRunning) {
-        if (vm.isRunning) vm.runTimer()
-    }
+    LaunchedEffect(routine) { vm.startWorkout(routine) }
+    LaunchedEffect(vm.isRunning) { if (vm.isRunning) vm.runTimer() }
 
     Column(Modifier.fillMaxSize().background(BackgroundDark)) {
-        Surface(
-            color = SurfaceLevel1,
-            modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(0.5.dp, OutlineBorder)
-        ) {
+        Surface(color = SurfaceLevel1, modifier = Modifier.fillMaxWidth(), border = BorderStroke(0.5.dp, OutlineBorder)) {
             Column(Modifier.statusBarsPadding().padding(16.dp)) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
                         Text(routine.name.uppercase(), style = AppTypography.labelMedium, color = AccentBlue)
-                        Text(
-                            vm.formatTime(vm.elapsedTime),
-                            style = AppTypography.displayLarge.copy(fontSize = 36.sp, fontFamily = FontFamily.Monospace)
-                        )
+                        Text(vm.formatTime(vm.elapsedTime), style = AppTypography.displayLarge.copy(fontSize = 36.sp, fontFamily = FontFamily.Monospace))
                     }
-                    if (vm.isSaving) {
-                        CircularProgressIndicator(color = AccentBlue, modifier = Modifier.size(24.dp))
-                    } else {
-                        TrainPrimaryButton("CONCLUIR", onClick = { vm.finishWorkout(onFinish) })
-                    }
+                    if (vm.isSaving) CircularProgressIndicator(color = AccentBlue)
+                    else TrainPrimaryButton("CONCLUIR", onClick = { vm.finishWorkout(onFinish) })
                 }
-
-                AnimatedVisibility(
-                    visible = vm.restTimeLeft > 0,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    Row(
-                        Modifier
-                            .padding(top = 12.dp)
-                            .fillMaxWidth()
-                            .background(AccentBlue.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                AnimatedVisibility(vm.restTimeLeft > 0) {
+                    Row(Modifier.padding(top = 12.dp).fillMaxWidth().background(AccentBlue.copy(alpha = 0.1f), RoundedCornerShape(4.dp)).padding(8.dp)) {
                         Icon(Icons.Default.Timer, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
                         Text(" DESCANSO: ${vm.restTimeLeft}s", color = AccentBlue, style = AppTypography.labelMedium)
                     }
                 }
             }
         }
-
-        LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.weight(1f)
-        ) {
+        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             vm.activeRoutine?.let { active ->
                 items(active.exercises) { ex ->
-                    ExerciseActiveCard(
-                        exercise = ex,
-                        onUpdateSet = { idx, w, r -> vm.updateSet(ex.id, idx, w, r) },
-                        onToggleSet = { idx -> vm.toggleSet(ex.id, idx) }
-                    )
+                    ExerciseActiveCard(ex, { idx, w, r -> vm.updateSet(ex.id, idx, w, r) }, { idx -> vm.toggleSet(ex.id, idx) })
                 }
             }
         }
@@ -238,61 +179,18 @@ fun WorkoutTrackerScreen(routine: Routine, onFinish: () -> Unit) {
 }
 
 @Composable
-fun ExerciseActiveCard(
-    exercise: Exercise,
-    onUpdateSet: (Int, String, String) -> Unit,
-    onToggleSet: (Int) -> Unit
-) {
+fun ExerciseActiveCard(exercise: Exercise, onUpdateSet: (Int, String, String) -> Unit, onToggleSet: (Int) -> Unit) {
     TrainCard {
         Column {
             Text(exercise.name, style = AppTypography.headlineLarge.copy(fontSize = 20.sp))
-            Spacer(Modifier.height(16.dp))
-
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("SET", style = AppTypography.labelSmall, color = OutlineBorder, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-                Text("KG", style = AppTypography.labelSmall, color = OutlineBorder, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Text("REPS", style = AppTypography.labelSmall, color = OutlineBorder, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Spacer(Modifier.width(48.dp))
-            }
-
-            Divider(color = OutlineBorder, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
-
+            Spacer(Modifier.height(12.dp))
             exercise.sets.forEachIndexed { idx, set ->
-                val rowColor = if (set.completed) AccentBlue.copy(alpha = 0.1f) else Color.Transparent
-
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(rowColor, RoundedCornerShape(4.dp))
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("${idx + 1}", Modifier.width(40.dp), style = AppTypography.labelMedium, textAlign = TextAlign.Center)
-
-                    WorkoutDataInput(
-                        value = if (set.weight > 0) "${set.weight}" else "",
-                        onValueChange = { onUpdateSet(idx, it, "${set.reps}") },
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    WorkoutDataInput(
-                        value = if (set.reps > 0) "${set.reps}" else "",
-                        onValueChange = { onUpdateSet(idx, "${set.weight}", it) },
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    IconButton(
-                        onClick = { onToggleSet(idx) },
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(if (set.completed) AccentBlue else SurfaceLevel0, RoundedCornerShape(4.dp))
-                    ) {
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = null,
-                            tint = if (set.completed) Color.White else OutlineBorder,
-                            modifier = Modifier.size(18.dp)
-                        )
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${idx + 1}", Modifier.width(30.dp), style = AppTypography.labelMedium)
+                    WorkoutDataInput(if (set.weight > 0) "${set.weight}" else "", { onUpdateSet(idx, it, "${set.reps}") }, Modifier.weight(1f))
+                    WorkoutDataInput(if (set.reps > 0) "${set.reps}" else "", { onUpdateSet(idx, "${set.weight}", it) }, Modifier.weight(1f))
+                    IconButton(onClick = { onToggleSet(idx) }, Modifier.background(if (set.completed) AccentBlue else SurfaceLevel0, RoundedCornerShape(4.dp))) {
+                        Icon(Icons.Default.Check, null, tint = if (set.completed) Color.White else OutlineBorder)
                     }
                 }
             }
@@ -303,21 +201,12 @@ fun ExerciseActiveCard(
 @Composable
 fun WorkoutDataInput(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier
-            .padding(horizontal = 4.dp)
-            .height(36.dp)
-            .background(SurfaceLevel0, RoundedCornerShape(4.dp))
-            .border(0.5.dp, OutlineBorder, RoundedCornerShape(4.dp)),
+        modifier = modifier.padding(4.dp).height(36.dp).background(SurfaceLevel0, RoundedCornerShape(4.dp)).border(0.5.dp, OutlineBorder, RoundedCornerShape(4.dp)),
         contentAlignment = Alignment.Center
     ) {
         BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = AppTypography.labelMedium.copy(
-                color = TextPrimary,
-                textAlign = TextAlign.Center,
-                fontFamily = FontFamily.Monospace
-            ),
+            value = value, onValueChange = onValueChange,
+            textStyle = AppTypography.labelMedium.copy(color = TextPrimary, textAlign = TextAlign.Center, fontFamily = FontFamily.Monospace),
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             cursorBrush = SolidColor(AccentBlue),

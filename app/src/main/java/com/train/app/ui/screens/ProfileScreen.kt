@@ -28,7 +28,6 @@ fun ProfileScreen() {
     var sessions by remember { mutableStateOf<List<WorkoutSession>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Carregar histórico de sessões do Firestore em tempo real
     LaunchedEffect(currentUser?.uid) {
         val uid = currentUser?.uid
         if (uid != null) {
@@ -47,69 +46,31 @@ fun ProfileScreen() {
     }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark)
-            .padding(horizontal = 16.dp),
+        modifier = Modifier.fillMaxSize().background(BackgroundDark).padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Espaço para a StatusBar
         item { Spacer(Modifier.statusBarsPadding()) }
+        item { ProfileHeader(email = currentUser?.email ?: "Atleta") }
+        item { StatsRow(totalWorkouts = sessions.size) }
 
-        // Cabeçalho do Perfil
-        item {
-            ProfileHeader(email = currentUser?.email ?: "Atleta")
-        }
-
-        // Blocos de Estatísticas
-        item {
-            StatsRow(totalWorkouts = sessions.size)
-        }
-
-        // Título da Secção de Histórico
-        item {
-            Text(
-                text = "HISTÓRICO RECENTE",
-                style = AppTypography.labelMedium,
-                color = OutlineBorder
-            )
-        }
-
-        // Lista de Sessões
         if (isLoading) {
-            item {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AccentBlue)
-                }
-            }
+            item { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AccentBlue) } }
         } else if (sessions.isEmpty()) {
-            item {
-                Text(
-                    "Ainda não completaste nenhum treino. Os teus registos aparecerão aqui!",
-                    style = AppTypography.bodyLarge,
-                    color = OutlineBorder,
-                    modifier = Modifier.padding(vertical = 24.dp)
-                )
-            }
+            item { Text("Sem treinos registados.", color = OutlineBorder, modifier = Modifier.padding(vertical = 24.dp)) }
         } else {
-            items(sessions) { session ->
-                SessionHistoryCard(session)
-            }
+            items(sessions) { session -> SessionHistoryCard(session) }
         }
 
-        // Botão de Logout
         item {
             Spacer(Modifier.height(24.dp))
             OutlinedButton(
-                onClick = {
-                    FirebaseManager.auth.signOut()
-                },
+                onClick = { FirebaseManager.auth.signOut() },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentYellow),
                 border = BorderStroke(1.dp, AccentYellow.copy(alpha = 0.5f)),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
             ) {
-                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.AutoMirrored.Filled.Logout, null)
                 Spacer(Modifier.width(8.dp))
                 Text("SAIR DA CONTA", style = AppTypography.labelMedium)
             }
@@ -121,21 +82,15 @@ fun ProfileScreen() {
 @Composable
 fun ProfileHeader(email: String) {
     Column(Modifier.padding(vertical = 8.dp)) {
-        Text(text = "PERFIL DO ATLETA", style = AppTypography.labelMedium, color = AccentBlue)
-        Text(
-            text = email.split("@")[0].uppercase(),
-            style = AppTypography.displayLarge.copy(fontSize = 32.sp)
-        )
-        Text(text = email, style = AppTypography.bodyLarge, color = OutlineBorder)
+        Text("PERFIL", style = AppTypography.labelMedium, color = AccentBlue)
+        Text(email.split("@")[0].uppercase(), style = AppTypography.displayLarge.copy(fontSize = 32.sp))
+        Text(email, style = AppTypography.bodyLarge, color = OutlineBorder)
     }
 }
 
 @Composable
 fun StatsRow(totalWorkouts: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         StatBox(label = "TREINOS", value = totalWorkouts.toString(), modifier = Modifier.weight(1f))
         StatBox(label = "NÍVEL", value = (totalWorkouts / 5 + 1).toString(), modifier = Modifier.weight(1f))
     }
@@ -145,51 +100,28 @@ fun StatsRow(totalWorkouts: Int) {
 fun StatBox(label: String, value: String, modifier: Modifier = Modifier) {
     TrainCard(modifier = modifier) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = label, style = AppTypography.labelSmall, color = OutlineBorder)
-            Text(
-                text = value,
-                style = AppTypography.displayLarge.copy(
-                    fontSize = 28.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-            )
+            Text(label, style = AppTypography.labelSmall, color = OutlineBorder)
+            Text(value, style = AppTypography.displayLarge.copy(fontSize = 28.sp, fontFamily = FontFamily.Monospace))
         }
     }
 }
 
 @Composable
 fun SessionHistoryCard(session: WorkoutSession) {
-    // Correção: Uso de Locale.forLanguageTag para evitar depreciação
-    val date = SimpleDateFormat("dd MMM, HH:mm", Locale.forLanguageTag("pt-PT"))
-        .format(Date(session.endTime))
-
+    val date = SimpleDateFormat("dd MMM, HH:mm", Locale.forLanguageTag("pt-PT")).format(Date(session.endTime))
     TrainCard {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(session.routineName, style = AppTypography.headlineLarge.copy(fontSize = 18.sp))
                 Text(date.uppercase(), style = AppTypography.labelSmall, color = OutlineBorder)
             }
-
             Spacer(Modifier.height(12.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row {
                 Icon(Icons.Default.History, null, tint = AccentBlue, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = "${session.durationMinutes} MIN",
-                    style = AppTypography.labelMedium,
-                    color = AccentBlue
-                )
-
-                Spacer(Modifier.width(24.dp))
-
+                Text("${session.durationMinutes} MIN", style = AppTypography.labelMedium, color = AccentBlue, modifier = Modifier.padding(start = 4.dp))
+                Spacer(Modifier.width(16.dp))
                 Icon(Icons.Default.Timeline, null, tint = AccentPurple, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = "${session.exercises.size} EXERCÍCIOS",
-                    style = AppTypography.labelMedium,
-                    color = AccentPurple
-                )
+                Text("${session.exercises.size} EXERCÍCIOS", style = AppTypography.labelMedium, color = AccentPurple, modifier = Modifier.padding(start = 4.dp))
             }
         }
     }

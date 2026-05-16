@@ -7,9 +7,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import com.train.app.ui.theme.*
 
+/**
+ * Botão Principal: Azul (#0A62D0) com texto branco.
+ * Raio de 4px conforme o DESIGN.md.
+ */
 @Composable
 fun TrainPrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Button(
@@ -22,6 +27,9 @@ fun TrainPrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = M
     }
 }
 
+/**
+ * Botão Secundário: Contorno branco/cinza.
+ */
 @Composable
 fun TrainSecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     OutlinedButton(
@@ -35,6 +43,9 @@ fun TrainSecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier =
     }
 }
 
+/**
+ * Card do Sistema: Usa SurfaceLevel1 (#252324) e raio de 8px.
+ */
 @Composable
 fun TrainCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Surface(
@@ -47,9 +58,11 @@ fun TrainCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     }
 }
 
+/**
+ * Chip de Categoria/Aviso: Cores Purple ou Yellow a 20% de opacidade.
+ */
 @Composable
 fun TrainChip(text: String, isWarning: Boolean = false) {
-    // Correção: Restaurado parâmetro isWarning para compatibilidade com o FeedScreen
     val bgColor = if (isWarning) ChipYellowBg else ChipPurpleBg
     val textColor = if (isWarning) AccentYellow else AccentPurple
 
@@ -66,6 +79,9 @@ fun TrainChip(text: String, isWarning: Boolean = false) {
     }
 }
 
+/**
+ * Input de Texto: Fundo escuro (#191718) e borda azul no foco.
+ */
 @Composable
 fun TrainInput(value: String, onValueChange: (String) -> Unit, placeholder: String) {
     OutlinedTextField(
@@ -87,12 +103,18 @@ fun TrainInput(value: String, onValueChange: (String) -> Unit, placeholder: Stri
     )
 }
 
+/**
+ * Barra de Progresso: Altura de 4px, fundo 10% branco, preenchimento AccentBlue.
+ */
 @Composable
 fun TrainProgressBar(progress: Float, modifier: Modifier = Modifier) {
     LinearProgressIndicator(
         progress = { progress },
-        modifier = modifier.fillMaxWidth().height(4.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(4.dp),
         color = AccentBlue,
-        trackColor = Color.White.copy(alpha = 0.1f)
+        trackColor = Color.White.copy(alpha = 0.1f),
+        strokeCap = StrokeCap.Round
     )
 }

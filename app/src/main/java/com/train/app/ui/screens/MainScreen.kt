@@ -18,11 +18,9 @@ import com.train.app.data.models.Routine
 fun MainScreen() {
     val navController = rememberNavController()
     var activeWorkoutRoutine by remember { mutableStateOf<Routine?>(null) }
-
-    // Estado reativo para monitorizar o utilizador em tempo real
     var currentUser by remember { mutableStateOf(FirebaseManager.auth.currentUser) }
 
-    // Listener para reagir a mudanças de login/logout imediatamente
+    // Sincronização do estado de autenticação para redirecionamento e UI
     DisposableEffect(Unit) {
         val listener = { auth: com.google.firebase.auth.FirebaseAuth ->
             currentUser = auth.currentUser
@@ -31,7 +29,7 @@ fun MainScreen() {
         onDispose { FirebaseManager.auth.removeAuthStateListener(listener) }
     }
 
-    // Efeito de redirecionamento para o Login quando o utilizador sai
+    // Monitorização global do Logout
     LaunchedEffect(currentUser) {
         if (currentUser == null) {
             navController.navigate(Screen.Login.route) {
@@ -46,8 +44,11 @@ fun MainScreen() {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
 
-            // Só mostra a barra inferior se logado e fora de ecrãs de foco (Login/Treino)
-            if (currentUser != null && currentRoute != Screen.Login.route && activeWorkoutRoutine == null) {
+            // Oculta a barra de navegação no Login, no Editor e durante o Treino Ativo
+            if (currentUser != null &&
+                currentRoute != Screen.Login.route &&
+                currentRoute != Screen.RoutineEditor.route &&
+                activeWorkoutRoutine == null) {
                 BottomNavBar(navController)
             }
         },
@@ -68,13 +69,22 @@ fun MainScreen() {
             composable(Screen.Home.route) { HomeScreen() }
             composable(Screen.Feed.route) { FeedScreen() }
             composable(Screen.Routines.route) {
-                RoutinesScreen(onStartWorkout = { routine -> activeWorkoutRoutine = routine })
+                RoutinesScreen(
+                    onStartWorkout = { routine -> activeWorkoutRoutine = routine },
+                    onNavigateToEditor = { navController.navigate(Screen.RoutineEditor.route) }
+                )
             }
+            composable(Screen.RoutineEditor.route) {
+                RoutineEditorScreen(onSaveComplete = {
+                    navController.popBackStack()
+                })
+            }
+            composable(Screen.Evolution.route) { EvolutionScreen() }
             composable(Screen.Chat.route) { ChatScreen() }
             composable(Screen.Profile.route) { ProfileScreen() }
         }
 
-        // Overlay de Treino Ativo (HUD de Performance)
+        // Overlay do Workout Tracker (HUD de Performance)
         activeWorkoutRoutine?.let { routine ->
             WorkoutTrackerScreen(
                 routine = routine,
@@ -88,7 +98,7 @@ fun MainScreen() {
 fun BottomNavBar(navController: NavHostController) {
     val items = listOf(
         NavItem(Screen.Home.route, Icons.Default.Home, "Home"),
-        NavItem(Screen.Feed.route, Icons.Default.DynamicFeed, "Feed"),
+        NavItem(Screen.Evolution.route, Icons.Default.Timeline, "Evolução"),
         NavItem(Screen.Routines.route, Icons.Default.FitnessCenter, "Treinar"),
         NavItem(Screen.Chat.route, Icons.Default.ChatBubble, "Chat"),
         NavItem(Screen.Profile.route, Icons.Default.Person, "Perfil")
