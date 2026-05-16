@@ -23,10 +23,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.google.firebase.auth.FirebaseAuth
 import com.train.app.data.FirebaseManager
 import com.train.app.data.models.Routine
@@ -70,6 +72,8 @@ fun MainScreen() {
             val showBottomBar = currentUser != null &&
                     currentRoute != Screen.Login.route &&
                     currentRoute != Screen.RoutineEditor.route &&
+                    currentRoute != Screen.WorkoutCalendar.route &&
+                    currentRoute != Screen.WorkoutDetail.route &&
                     activeWorkoutRoutine == null
 
             if (showBottomBar) {
@@ -96,7 +100,39 @@ fun MainScreen() {
             composable(Screen.Feed.route) { FeedScreen() }
             composable(Screen.Evolution.route) { EvolutionScreen() }
             composable(Screen.Chat.route) { ChatScreen() }
-            composable(Screen.Profile.route) { ProfileScreen() }
+
+            composable(Screen.WorkoutCalendar.route) {
+                WorkoutCalendarScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenWorkoutDetail = { sessionId ->
+                        navController.navigate(Screen.WorkoutDetail.createRoute(sessionId))
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.WorkoutDetail.route,
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val sessionId = backStackEntry.arguments?.getString("sessionId")
+                if (sessionId != null) {
+                    WorkoutDetailScreen(
+                        sessionId = sessionId,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+            }
+
+            composable(Screen.Profile.route) {
+                ProfileScreen(
+                    onOpenCalendar = {
+                        navController.navigate(Screen.WorkoutCalendar.route)
+                    },
+                    onOpenWorkoutDetail = { sessionId ->
+                        navController.navigate(Screen.WorkoutDetail.createRoute(sessionId))
+                    }
+                )
+            }
 
             composable(Screen.Routines.route) {
                 RoutinesScreen(

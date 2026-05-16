@@ -1,6 +1,7 @@
 package com.train.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,10 +13,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,7 +37,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.auth.FirebaseUser
 import com.train.app.data.FirebaseManager
 import com.train.app.data.models.WorkoutSession
 import com.train.app.ui.components.TrainCard
@@ -47,11 +52,12 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(
+    onOpenCalendar: () -> Unit = {},
+    onOpenWorkoutDetail: (String) -> Unit = {}
+) {
     val currentUser = FirebaseManager.auth.currentUser
-    var routinesCount by remember { mutableStateOf(0) }
-    var sessionsCount by remember { mutableStateOf(0) }
-    var lastWorkoutDate by remember { mutableStateOf<String?>(null) }
+    var sessions by remember { mutableStateOf<List<WorkoutSession>>(emptyList()) }
     var isLoading by remember { mutableStateOf(currentUser != null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -61,32 +67,15 @@ fun ProfileScreen() {
             return@LaunchedEffect
         }
 
-        val userId = currentUser.uid
         FirebaseManager.firestore
             .collection("users")
-            .document(userId)
-            .collection("routines")
+            .document(currentUser.uid)
+            .collection("sessions")
             .get()
-            .addOnSuccessListener { routinesSnapshot ->
-                routinesCount = routinesSnapshot.size()
-
-                FirebaseManager.firestore
-                    .collection("users")
-                    .document(userId)
-                    .collection("sessions")
-                    .get()
-                    .addOnSuccessListener { sessionsSnapshot ->
-                        val sessions = sessionsSnapshot.toObjects(WorkoutSession::class.java)
-                        sessionsCount = sessions.size
-                        lastWorkoutDate = sessions.maxByOrNull { it.startTime }?.startTime?.let { millis ->
-                            SimpleDateFormat("dd MMM yyyy", Locale("pt", "PT")).format(Date(millis))
-                        }
-                        isLoading = false
-                    }
-                    .addOnFailureListener { error ->
-                        errorMessage = error.message ?: "Erro ao carregar sessões"
-                        isLoading = false
-                    }
+            .addOnSuccessListener { snapshot ->
+                sessions = snapshot.toObjects(WorkoutSession::class.java)
+                    .sortedByDescending { it.startTime }
+                isLoading = false
             }
             .addOnFailureListener { error ->
                 errorMessage = error.message ?: "Erro ao carregar perfil"
@@ -94,152 +83,286 @@ fun ProfileScreen() {
             }
     }
 
-    Column(
+    if (currentUser == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundDark),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Sem utilizador autenticado", color = AccentYellow)
+        }
+        return
+    }
+
+    val username = currentUser.displayName ?: currentUser.email?.substringBefore("@")?.replaceFirstChar {
+        if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+    } ?: "Atleta"
+
+    val totalVolume = sessions.sumOf { it.totalVolume.toDouble() }.toInt()
+    val totalWorkouts = sessions.size
+    val totalMinutes = sessions.sumOf { it.durationMinutes }
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundDark)
             .statusBarsPadding()
-            .padding(16.dp)
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("PERFIL", style = AppTypography.headlineLarge)
-        Spacer(modifier = Modifier.height(20.dp))
-
-        if (currentUser == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Sem utilizador autenticado", color = AccentYellow)
-            }
-            return@Column
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("PERFIL", style = AppTypography.headlineLarge)
         }
 
-        ProfileHeader(currentUser)
-        Spacer(modifier = Modifier.height(16.dp))
+        item {
+            TrainCard {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(76.dp)
+                                .clip(CircleShape)
+                                .background(AccentBlue.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = AccentBlue,
+                                modifier = Modifier.size(38.dp)
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = username.uppercase(),
+                                style = AppTypography.headlineLarge.copy(fontSize = 22.sp),
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = currentUser.email ?: "Conta sem email",
+                                style = AppTypography.bodyLarge,
+                                color = OutlineBorder
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = Color(0xFF2B2A2A))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        ProfileStatItem("TREINOS", totalWorkouts.toString())
+                        ProfileStatItem("VOLUME", "${totalVolume}KG")
+                        ProfileStatItem("MIN", totalMinutes.toString())
+                    }
+                }
+            }
+        }
+
+        item {
+            CalendarEntryCard(
+                sessions = sessions,
+                onOpenCalendar = onOpenCalendar
+            )
+        }
+
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TrainSecondaryButton(
+                    text = "CALENDÁRIO",
+                    onClick = onOpenCalendar,
+                    modifier = Modifier.weight(1f)
+                )
+                TrainPrimaryButton(
+                    text = "TERMINAR SESSÃO",
+                    onClick = { FirebaseManager.auth.signOut() },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        item {
+            Text("HISTÓRICO DE TREINOS", style = AppTypography.labelSmall, color = OutlineBorder)
+        }
 
         when {
             isLoading -> {
-                Box(modifier = Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AccentBlue)
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = AccentBlue)
+                    }
                 }
             }
 
             errorMessage != null -> {
-                TrainCard {
-                    Text(errorMessage!!, color = AccentYellow)
+                item {
+                    TrainCard {
+                        Text(errorMessage!!, color = AccentYellow)
+                    }
+                }
+            }
+
+            sessions.isEmpty() -> {
+                item {
+                    TrainCard {
+                        Text("Ainda não existem treinos concluídos.", color = OutlineBorder)
+                    }
                 }
             }
 
             else -> {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ProfileStatCard("ROTINAS", routinesCount.toString(), Modifier.weight(1f))
-                    ProfileStatCard("TREINOS", sessionsCount.toString(), Modifier.weight(1f))
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                TrainCard {
-                    Column {
-                        Text("RESUMO", style = AppTypography.labelSmall, color = OutlineBorder)
-                        Spacer(modifier = Modifier.height(10.dp))
-                        ProfileInfoRow("Email", currentUser.email ?: "Sem email")
-                        ProfileInfoRow("Nome", currentUser.displayName ?: usernameFromEmail(currentUser.email))
-                        ProfileInfoRow("Último treino", lastWorkoutDate ?: "Ainda sem treinos")
-                        ProfileInfoRow("Plano", "Free")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                TrainCard {
-                    Column {
-                        Text("CONTA", style = AppTypography.labelSmall, color = OutlineBorder)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        TrainSecondaryButton(
-                            text = "EDITAR PERFIL",
-                            onClick = { },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        TrainPrimaryButton(
-                            text = "TERMINAR SESSÃO",
-                            onClick = { FirebaseManager.auth.signOut() },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                items(sessions.take(12)) { session ->
+                    WorkoutHistoryCard(
+                        session = session,
+                        onClick = { onOpenWorkoutDetail(session.id) }
+                    )
                 }
             }
         }
+
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }
 
 @Composable
-private fun ProfileHeader(user: FirebaseUser) {
-    val displayName = user.displayName ?: usernameFromEmail(user.email)
-    val email = user.email ?: "Conta sem email"
+private fun ProfileStatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = AppTypography.labelSmall, color = OutlineBorder)
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = value,
+            style = AppTypography.headlineLarge.copy(
+                fontSize = 20.sp,
+                fontFamily = FontFamily.Monospace
+            ),
+            color = Color.White
+        )
+    }
+}
 
-    TrainCard {
+@Composable
+private fun CalendarEntryCard(
+    sessions: List<WorkoutSession>,
+    onOpenCalendar: () -> Unit
+) {
+    val trainedDays = sessions.map {
+        SimpleDateFormat("dd/MM", Locale("pt", "PT")).format(Date(it.startTime))
+    }.distinct().take(6)
+
+    TrainCard(
+        modifier = Modifier.clickable { onOpenCalendar() }
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(AccentBlue.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    tint = AccentBlue,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
-
             Column(modifier = Modifier.weight(1f)) {
+                Text("CALENDÁRIO", style = AppTypography.labelSmall, color = OutlineBorder)
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = displayName.uppercase(),
-                    style = AppTypography.headlineLarge.copy(fontSize = 22.sp),
-                    color = Color.White
+                    text = if (trainedDays.isEmpty()) "Sem dias registados ainda"
+                    else trainedDays.joinToString("  •  "),
+                    color = Color.White,
+                    style = AppTypography.bodyLarge
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(email, style = AppTypography.bodyLarge, color = OutlineBorder)
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    tint = AccentBlue
+                )
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = OutlineBorder
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ProfileStatCard(title: String, value: String, modifier: Modifier = Modifier) {
-    TrainCard(modifier = modifier) {
-        Column {
-            Text(title, style = AppTypography.labelSmall, color = OutlineBorder)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = value,
-                style = AppTypography.headlineLarge.copy(
-                    fontSize = 26.sp,
-                    fontFamily = FontFamily.Monospace
-                ),
-                color = Color.White
-            )
+private fun WorkoutHistoryCard(
+    session: WorkoutSession,
+    onClick: () -> Unit
+) {
+    val date = remember(session.startTime) {
+        SimpleDateFormat("dd MMM yyyy", Locale("pt", "PT")).format(Date(session.startTime))
+    }
+    val completedSets = session.exercises.sumOf { exercise ->
+        exercise.sets.count { it.completed }
+    }
+
+    TrainCard(
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = session.routineName.ifBlank { "Treino" },
+                        style = AppTypography.headlineLarge.copy(fontSize = 18.sp),
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(date, style = AppTypography.labelSmall, color = OutlineBorder)
+                }
+
+                Text(
+                    text = "${session.totalVolume.toInt()} KG",
+                    style = AppTypography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+                    color = AccentBlue
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = Color(0xFF2B2A2A))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                HistoryMetric("DURAÇÃO", "${session.durationMinutes} min")
+                HistoryMetric("SÉRIES", completedSets.toString())
+                HistoryMetric("EXERCÍCIOS", session.exercises.size.toString())
+            }
         }
     }
 }
 
 @Composable
-private fun ProfileInfoRow(label: String, value: String) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(label.uppercase(), style = AppTypography.labelSmall, color = OutlineBorder)
+private fun HistoryMetric(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = AppTypography.labelSmall, color = OutlineBorder)
         Spacer(modifier = Modifier.height(4.dp))
-        Text(value, style = AppTypography.bodyLarge, color = Color.White)
-        Spacer(modifier = Modifier.height(12.dp))
-    }
-}
-
-private fun usernameFromEmail(email: String?): String {
-    if (email.isNullOrBlank()) return "ATLETA"
-    return email.substringBefore("@").replaceFirstChar { char ->
-        if (char.isLowerCase()) char.titlecase(Locale.getDefault()) else char.toString()
+        Text(
+            text = value,
+            style = AppTypography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+            color = Color.White
+        )
     }
 }

@@ -3,19 +3,35 @@ package com.train.app.viewmodels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.train.app.data.FirebaseManager
+import com.train.app.data.models.Exercise
 import com.train.app.data.models.Routine
+import com.train.app.data.models.SetType
 import com.train.app.data.models.WorkoutSession
+import com.train.app.data.models.WorkoutSet
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class WorkoutViewModel : ViewModel() {
+    enum class PreviousValuesMode {
+        ANY_WORKOUT,
+        SAME_ROUTINE
+    }
+
+    data class PreviousSetValue(
+        val weight: Float = 0f,
+        val reps: Int = 0,
+        val completed: Boolean = false
+    )
+
     var activeRoutine by mutableStateOf<Routine?>(null)
         private set
 
@@ -31,6 +47,17 @@ class WorkoutViewModel : ViewModel() {
     var restTimeLeft by mutableIntStateOf(0)
         private set
 
+    var isLoadingPreviousValues by mutableStateOf(false)
+        private set
+
+    var previousValuesMode by mutableStateOf(PreviousValuesMode.ANY_WORKOUT)
+        private set
+
+    var autoCopyLastSet by mutableStateOf(true)
+        private set
+
+    val previousExerciseValues = mutableStateMapOf<String, List<PreviousSetValue>>()
+
     private var startTime by mutableLongStateOf(0L)
     private var timerJob: Job? = null
     private var restTimerJob: Job? = null
@@ -42,6 +69,7 @@ class WorkoutViewModel : ViewModel() {
         startTime = System.currentTimeMillis()
         elapsedTime = 0L
         isRunning = true
+        previousExerciseValues.clear()
 
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
@@ -50,10 +78,67 @@ class WorkoutViewModel : ViewModel() {
                 delay(1000)
             }
         }
+
+        loadPreviousValues(routine)
     }
 
     suspend fun runTimer() {
         if (!isRunning) return
+    }
+
+    fun updatePreviousValuesMode(mode: PreviousValuesMode) {
+        previousValuesMode = mode
+        activeRoutine?.let { loadPreviousValues(it) }
+    }
+
+    fun toggleAutoCopyLastSet() {
+        autoCopyLastSet = !autoCopyLastSet
+    }
+
+    private fun loadPreviousValues(routine: Routine) {
+        val userId = FirebaseManager.auth.currentUser?.uid ?: return
+        isLoadingPreviousValues = true
+
+        FirebaseManager.firestore
+            .collection("users")
+            .document(userId)
+            .collection("sessions")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val sessions = snapshot.toObjects(WorkoutSession::class.java)
+                    .sortedByDescending { it.startTime }
+
+                routine.exercises.forEach { exercise ->
+                    val matchedExercise = findPreviousExercise(routine, exercise, sessions)
+                    previousExerciseValues[exercise.id] = matchedExercise?.sets?.map { set ->
+                        PreviousSetValue(
+                            weight = set.weight,
+                            reps = set.reps,
+                            completed = set.completed
+                        )
+                    }.orEmpty()
+                }
+
+                isLoadingPreviousValues = false
+            }
+            .addOnFailureListener {
+                isLoadingPreviousValues = false
+            }
+    }
+
+    private fun findPreviousExercise(
+        routine: Routine,
+        exercise: Exercise,
+        sessions: List<WorkoutSession>
+    ): Exercise? {
+        val filteredSessions = when (previousValuesMode) {
+            PreviousValuesMode.ANY_WORKOUT -> sessions
+            PreviousValuesMode.SAME_ROUTINE -> sessions.filter { it.routineId == routine.id }
+        }
+
+        return filteredSessions
+            .flatMap { session -> session.exercises }
+            .firstOrNull { previous -> previous.name.equals(exercise.name, ignoreCase = true) }
     }
 
     fun startRestTimer(seconds: Int = 90) {
@@ -67,10 +152,57 @@ class WorkoutViewModel : ViewModel() {
         }
     }
 
+    fun stopRestTimer() {
+        restTimerJob?.cancel()
+        restTimeLeft = 0
+    }
+
     fun formatTime(ms: Long): String {
         val minutes = TimeUnit.MILLISECONDS.toMinutes(ms)
         val seconds = TimeUnit.MILLISECONDS.toSeconds(ms) % 60
         return String.format("%02d:%02d", minutes, seconds)
+    }
+
+    fun formatPreviousValue(previousSet: PreviousSetValue): String {
+        val weightText = if (previousSet.weight % 1f == 0f) {
+            previousSet.weight.toInt().toString()
+        } else {
+            String.format(Locale.US, "%.1f", previousSet.weight)
+        }
+        return "$weightText kg × ${previousSet.reps}"
+    }
+
+    fun getPreviousSetValue(exerciseId: String, setIndex: Int): PreviousSetValue? {
+        return previousExerciseValues[exerciseId]?.getOrNull(setIndex)
+    }
+
+    fun applyPreviousSetValue(exerciseId: String, setIndex: Int) {
+        val previousSet = getPreviousSetValue(exerciseId, setIndex) ?: return
+        updateSet(
+            exerciseId = exerciseId,
+            setIndex = setIndex,
+            weight = previousSet.weight.toString(),
+            reps = previousSet.reps.toString()
+        )
+    }
+
+    fun addSet(exerciseId: String) {
+        val routine = activeRoutine ?: return
+
+        val updatedExercises = routine.exercises.map { exercise ->
+            if (exercise.id != exerciseId) return@map exercise
+
+            val updatedSets = exercise.sets.toMutableList()
+            val baseSet = if (autoCopyLastSet) {
+                updatedSets.lastOrNull()?.copy(completed = false) ?: WorkoutSet()
+            } else {
+                WorkoutSet()
+            }
+            updatedSets.add(baseSet)
+            exercise.copy(sets = updatedSets)
+        }
+
+        activeRoutine = routine.copy(exercises = updatedExercises)
     }
 
     fun updateSet(exerciseId: String, setIndex: Int, weight: String, reps: String) {
@@ -94,6 +226,21 @@ class WorkoutViewModel : ViewModel() {
         activeRoutine = routine.copy(exercises = updatedExercises)
     }
 
+    fun updateSetType(exerciseId: String, setIndex: Int, setType: SetType) {
+        val routine = activeRoutine ?: return
+
+        val updatedExercises = routine.exercises.map { exercise ->
+            if (exercise.id != exerciseId) return@map exercise
+            if (setIndex !in exercise.sets.indices) return@map exercise
+
+            val updatedSets = exercise.sets.toMutableList()
+            updatedSets[setIndex] = updatedSets[setIndex].copy(type = setType)
+            exercise.copy(sets = updatedSets)
+        }
+
+        activeRoutine = routine.copy(exercises = updatedExercises)
+    }
+
     fun toggleSet(exerciseId: String, setIndex: Int) {
         val routine = activeRoutine ?: return
 
@@ -104,11 +251,16 @@ class WorkoutViewModel : ViewModel() {
             val updatedSets = exercise.sets.toMutableList()
             val currentSet = updatedSets[setIndex]
             val newCompletedState = !currentSet.completed
+            val nextSet = updatedSets.getOrNull(setIndex + 1)
 
             updatedSets[setIndex] = currentSet.copy(completed = newCompletedState)
 
             if (newCompletedState) {
-                startRestTimer()
+                if (nextSet?.type == SetType.DROPSET) {
+                    stopRestTimer()
+                } else {
+                    startRestTimer()
+                }
             }
 
             exercise.copy(sets = updatedSets)
@@ -169,6 +321,8 @@ class WorkoutViewModel : ViewModel() {
         startTime = 0L
         isRunning = false
         restTimeLeft = 0
+        isLoadingPreviousValues = false
+        previousExerciseValues.clear()
     }
 
     override fun onCleared() {
