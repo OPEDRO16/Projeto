@@ -67,12 +67,12 @@ fun MainScreen() {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
 
-            if (
-                currentUser != null &&
-                currentRoute != Screen.Login.route &&
-                currentRoute != Screen.RoutineEditor.route &&
-                activeWorkoutRoutine == null
-            ) {
+            val showBottomBar = currentUser != null &&
+                    currentRoute != Screen.Login.route &&
+                    currentRoute != Screen.RoutineEditor.route &&
+                    activeWorkoutRoutine == null
+
+            if (showBottomBar) {
                 BottomNavBar(navController)
             }
         },
@@ -91,35 +91,46 @@ fun MainScreen() {
                     }
                 }
             }
+
             composable(Screen.Home.route) { HomeScreen() }
             composable(Screen.Feed.route) { FeedScreen() }
-            composable(Screen.Routines.route) {
-                RoutinesScreen(
-                    onStartWorkout = { routine -> activeWorkoutRoutine = routine },
-                    onNavigateToEditor = { navController.navigate(Screen.RoutineEditor.route) }
-                )
-            }
-            composable(Screen.RoutineEditor.route) {
-                RoutineEditorScreen(
-                    onSaveComplete = { navController.popBackStack() }
-                )
-            }
             composable(Screen.Evolution.route) { EvolutionScreen() }
             composable(Screen.Chat.route) { ChatScreen() }
             composable(Screen.Profile.route) { ProfileScreen() }
+
+            composable(Screen.Routines.route) {
+                RoutinesScreen(
+                    onStartWorkout = { routine ->
+                        activeWorkoutRoutine = routine
+                    },
+                    onNavigateToEditor = {
+                        navController.navigate(Screen.RoutineEditor.route)
+                    }
+                )
+            }
+
+            composable(Screen.RoutineEditor.route) {
+                RoutineEditorScreen(
+                    onSaveComplete = {
+                        navController.popBackStack()
+                    }
+                )
+            }
         }
 
         activeWorkoutRoutine?.let { routine ->
             WorkoutTrackerScreen(
                 routine = routine,
-                onFinish = { activeWorkoutRoutine = null }
+                onFinish = {
+                    activeWorkoutRoutine = null
+                }
             )
         }
     }
 }
 
 @Composable
-fun BottomNavBar(navController: NavHostController) {
+private fun BottomNavBar(navController: NavHostController) {
     val items = listOf(
         NavItem(Screen.Home.route, Icons.Default.Home, "Home"),
         NavItem(Screen.Evolution.route, Icons.Default.Timeline, "Evolução"),
@@ -134,17 +145,26 @@ fun BottomNavBar(navController: NavHostController) {
 
         items.forEach { item ->
             NavigationBarItem(
-                icon = { Icon(item.icon, contentDescription = item.title) },
-                label = { Text(item.title) },
                 selected = currentRoute == item.route,
                 onClick = {
                     if (currentRoute != item.route) {
                         navController.navigate(item.route) {
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
                             launchSingleTop = true
                             restoreState = true
                         }
                     }
+                },
+                icon = {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.title
+                    )
+                },
+                label = {
+                    Text(item.title)
                 },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = AccentBlue,
@@ -158,4 +178,8 @@ fun BottomNavBar(navController: NavHostController) {
     }
 }
 
-data class NavItem(val route: String, val icon: ImageVector, val title: String)
+private data class NavItem(
+    val route: String,
+    val icon: ImageVector,
+    val title: String
+)

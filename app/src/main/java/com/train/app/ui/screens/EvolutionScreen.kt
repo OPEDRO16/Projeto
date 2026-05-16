@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
@@ -25,14 +24,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.firestore.ktx.toObject
 import com.train.app.data.FirebaseManager
-import com.train.app.data.models.Exercise
 import com.train.app.data.models.WorkoutSession
 import com.train.app.ui.components.TrainCard
 import com.train.app.ui.theme.AccentBlue
@@ -49,7 +45,6 @@ fun EvolutionScreen() {
     var sessions by remember { mutableStateOf<List<WorkoutSession>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-
     val userId = FirebaseManager.auth.currentUser?.uid
 
     LaunchedEffect(userId) {
@@ -65,9 +60,8 @@ fun EvolutionScreen() {
             .collection("sessions")
             .get()
             .addOnSuccessListener { snapshot ->
-                sessions = snapshot.documents.mapNotNull { document ->
-                    document.toObject<WorkoutSession>()?.copy(id = document.id)
-                }.sortedByDescending { it.startTime }
+                sessions = snapshot.toObjects(WorkoutSession::class.java)
+                    .sortedByDescending { it.startTime }
                 isLoading = false
             }
             .addOnFailureListener { error ->
@@ -81,9 +75,8 @@ fun EvolutionScreen() {
             .fillMaxSize()
             .background(BackgroundDark)
             .statusBarsPadding()
-            .padding(horizontal = 16.dp)
+            .padding(16.dp)
     ) {
-        Spacer(modifier = Modifier.height(12.dp))
         Text("EVOLUÇÃO", style = AppTypography.headlineLarge)
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -96,13 +89,13 @@ fun EvolutionScreen() {
 
             errorMessage != null -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(text = errorMessage!!, color = AccentYellow)
+                    Text(errorMessage!!, color = AccentYellow)
                 }
             }
 
             sessions.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(text = "Ainda não existem treinos concluídos.", color = OutlineBorder)
+                    Text("Ainda não existem treinos concluídos.", color = OutlineBorder)
                 }
             }
 
@@ -147,11 +140,7 @@ fun EvolutionScreen() {
                     item {
                         TrainCard {
                             Column {
-                                Text(
-                                    text = "DESTAQUE",
-                                    style = AppTypography.labelSmall,
-                                    color = OutlineBorder
-                                )
+                                Text("DESTAQUE", style = AppTypography.labelSmall, color = OutlineBorder)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = bestExercise?.first ?: "Sem recordes ainda",
@@ -168,18 +157,12 @@ fun EvolutionScreen() {
                     }
 
                     item {
-                        Text(
-                            text = "ÚLTIMAS SESSÕES",
-                            style = AppTypography.labelSmall,
-                            color = OutlineBorder
-                        )
+                        Text("ÚLTIMAS SESSÕES", style = AppTypography.labelSmall, color = OutlineBorder)
                     }
 
                     items(sessions) { session ->
-                        SessionCard(session = session)
+                        SessionCard(session)
                     }
-
-                    item { Spacer(modifier = Modifier.height(24.dp)) }
                 }
             }
         }
@@ -187,18 +170,10 @@ fun EvolutionScreen() {
 }
 
 @Composable
-private fun StatsCard(
-    title: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
+private fun StatsCard(title: String, value: String, modifier: Modifier = Modifier) {
     TrainCard(modifier = modifier) {
         Column {
-            Text(
-                text = title,
-                style = AppTypography.labelSmall,
-                color = OutlineBorder
-            )
+            Text(title, style = AppTypography.labelSmall, color = OutlineBorder)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = value,
@@ -222,20 +197,8 @@ private fun SessionCard(session: WorkoutSession) {
         exercise.sets.count { it.completed }
     }
 
-    val cardBrush = Brush.verticalGradient(
-        colors = listOf(
-            Color(0xFF1D1C1C),
-            Color(0xFF151414)
-        )
-    )
-
     TrainCard {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(cardBrush, RoundedCornerShape(12.dp))
-                .padding(16.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -247,11 +210,7 @@ private fun SessionCard(session: WorkoutSession) {
                         style = AppTypography.headlineLarge.copy(fontSize = 20.sp),
                         color = Color.White
                     )
-                    Text(
-                        text = date,
-                        style = AppTypography.labelSmall,
-                        color = OutlineBorder
-                    )
+                    Text(date, style = AppTypography.labelSmall, color = OutlineBorder)
                 }
                 Text(
                     text = "${session.totalVolume.toInt()} KG",
@@ -268,9 +227,9 @@ private fun SessionCard(session: WorkoutSession) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                SessionMetric(label = "DURAÇÃO", value = "${session.durationMinutes} min")
-                SessionMetric(label = "SÉRIES", value = completedSets.toString())
-                SessionMetric(label = "EXERCÍCIOS", value = session.exercises.size.toString())
+                SessionMetric("DURAÇÃO", "${session.durationMinutes} min")
+                SessionMetric("SÉRIES", completedSets.toString())
+                SessionMetric("EXERCÍCIOS", session.exercises.size.toString())
             }
         }
     }
@@ -279,11 +238,7 @@ private fun SessionCard(session: WorkoutSession) {
 @Composable
 private fun SessionMetric(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = label,
-            style = AppTypography.labelSmall,
-            color = OutlineBorder
-        )
+        Text(label, style = AppTypography.labelSmall, color = OutlineBorder)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value,
@@ -298,12 +253,10 @@ private fun findBestExercise(sessions: List<WorkoutSession>): Pair<String, Strin
         session.exercises.flatMap { exercise ->
             exercise.sets
                 .filter { it.completed }
-                .map { set -> Triple(exercise, set.weight, set.reps) }
+                .map { set -> Triple(exercise.name, set.weight, set.reps) }
         }
     }
 
-    val best = allCompletedSets.maxByOrNull { (_, weight, reps) -> weight * reps }
-        ?: return null
-
-    return best.first.name to "Melhor registo: ${best.second.toInt()} kg x ${best.third} reps"
+    val best = allCompletedSets.maxByOrNull { (_, weight, reps) -> weight * reps } ?: return null
+    return best.first to "Melhor registo: ${best.second.toInt()} kg x ${best.third} reps"
 }

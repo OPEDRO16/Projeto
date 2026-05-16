@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -34,9 +32,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.firestore.FieldPath
 import com.train.app.data.FirebaseManager
-import com.train.app.data.models.Routine
 import com.train.app.data.models.WorkoutSession
 import com.train.app.ui.components.TrainCard
 import com.train.app.ui.components.TrainPrimaryButton
@@ -66,9 +62,6 @@ fun ProfileScreen() {
         }
 
         val userId = currentUser.uid
-        isLoading = true
-        errorMessage = null
-
         FirebaseManager.firestore
             .collection("users")
             .document(userId)
@@ -81,12 +74,9 @@ fun ProfileScreen() {
                     .collection("users")
                     .document(userId)
                     .collection("sessions")
-                    .orderBy(FieldPath.documentId())
                     .get()
                     .addOnSuccessListener { sessionsSnapshot ->
-                        val sessions = sessionsSnapshot.documents.mapNotNull { doc ->
-                            doc.toObject(WorkoutSession::class.java)
-                        }
+                        val sessions = sessionsSnapshot.toObjects(WorkoutSession::class.java)
                         sessionsCount = sessions.size
                         lastWorkoutDate = sessions.maxByOrNull { it.startTime }?.startTime?.let { millis ->
                             SimpleDateFormat("dd MMM yyyy", Locale("pt", "PT")).format(Date(millis))
@@ -121,50 +111,33 @@ fun ProfileScreen() {
             return@Column
         }
 
-        ProfileHeader(user = currentUser)
+        ProfileHeader(currentUser)
         Spacer(modifier = Modifier.height(16.dp))
 
         when {
             isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = AccentBlue)
                 }
             }
 
             errorMessage != null -> {
                 TrainCard {
-                    Text(text = errorMessage!!, color = AccentYellow)
+                    Text(errorMessage!!, color = AccentYellow)
                 }
             }
 
             else -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ProfileStatCard(
-                        title = "ROTINAS",
-                        value = routinesCount.toString(),
-                        modifier = Modifier.weight(1f)
-                    )
-                    ProfileStatCard(
-                        title = "TREINOS",
-                        value = sessionsCount.toString(),
-                        modifier = Modifier.weight(1f)
-                    )
+                    ProfileStatCard("ROTINAS", routinesCount.toString(), Modifier.weight(1f))
+                    ProfileStatCard("TREINOS", sessionsCount.toString(), Modifier.weight(1f))
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 TrainCard {
                     Column {
-                        Text(
-                            text = "RESUMO",
-                            style = AppTypography.labelSmall,
-                            color = OutlineBorder
-                        )
+                        Text("RESUMO", style = AppTypography.labelSmall, color = OutlineBorder)
                         Spacer(modifier = Modifier.height(10.dp))
                         ProfileInfoRow("Email", currentUser.email ?: "Sem email")
                         ProfileInfoRow("Nome", currentUser.displayName ?: usernameFromEmail(currentUser.email))
@@ -177,20 +150,18 @@ fun ProfileScreen() {
 
                 TrainCard {
                     Column {
-                        Text(
-                            text = "CONTA",
-                            style = AppTypography.labelSmall,
-                            color = OutlineBorder
-                        )
+                        Text("CONTA", style = AppTypography.labelSmall, color = OutlineBorder)
                         Spacer(modifier = Modifier.height(12.dp))
                         TrainSecondaryButton(
                             text = "EDITAR PERFIL",
-                            onClick = { }
+                            onClick = { },
+                            modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         TrainPrimaryButton(
                             text = "TERMINAR SESSÃO",
-                            onClick = { FirebaseManager.auth.signOut() }
+                            onClick = { FirebaseManager.auth.signOut() },
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -232,35 +203,17 @@ private fun ProfileHeader(user: FirebaseUser) {
                     color = Color.White
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = email,
-                    style = AppTypography.bodyLarge,
-                    color = OutlineBorder
-                )
+                Text(email, style = AppTypography.bodyLarge, color = OutlineBorder)
             }
-
-            Icon(
-                imageVector = Icons.Default.Logout,
-                contentDescription = null,
-                tint = OutlineBorder
-            )
         }
     }
 }
 
 @Composable
-private fun ProfileStatCard(
-    title: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
+private fun ProfileStatCard(title: String, value: String, modifier: Modifier = Modifier) {
     TrainCard(modifier = modifier) {
         Column {
-            Text(
-                text = title,
-                style = AppTypography.labelSmall,
-                color = OutlineBorder
-            )
+            Text(title, style = AppTypography.labelSmall, color = OutlineBorder)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = value,
@@ -277,17 +230,9 @@ private fun ProfileStatCard(
 @Composable
 private fun ProfileInfoRow(label: String, value: String) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = label.uppercase(),
-            style = AppTypography.labelSmall,
-            color = OutlineBorder
-        )
+        Text(label.uppercase(), style = AppTypography.labelSmall, color = OutlineBorder)
         Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = value,
-            style = AppTypography.bodyLarge,
-            color = Color.White
-        )
+        Text(value, style = AppTypography.bodyLarge, color = Color.White)
         Spacer(modifier = Modifier.height(12.dp))
     }
 }
