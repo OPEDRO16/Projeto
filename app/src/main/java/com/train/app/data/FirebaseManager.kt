@@ -4,17 +4,22 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
 
+/**
+ * Usamos 'by lazy' para garantir que as instâncias só são criadas
+ * quando chamadas, evitando crashes se o FirebaseApp ainda não estiver pronto.
+ */
 object FirebaseManager {
-    // Autenticação
-    val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
+    val auth: FirebaseAuth by lazy {
+        FirebaseAuth.getInstance()
+    }
 
-    // Firestore (Posts, Rotinas, Perfil)
-    val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
+    val firestore: FirebaseFirestore by lazy {
+        FirebaseFirestore.getInstance()
+    }
 
-    // Realtime DB (WebSockets para Chat)
     val database: FirebaseDatabase by lazy {
         FirebaseDatabase.getInstance().apply {
-            // Permite persistência offline para chat rápido
+            // Ativa persistência offline para evitar crashes sem net
             setPersistenceEnabled(true)
         }
     }

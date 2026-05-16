@@ -27,7 +27,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
         TrainInput(value = email, onValueChange = { email = it }, placeholder = "Email")
         Spacer(Modifier.height(16.dp))
-        TrainInput(value = password, onValueChange = { password = it }, placeholder = "Password")
+        TrainInput(value = password, onValueChange = { password = it }, placeholder = "Palavra-passe")
 
         if (errorMessage != null) {
             Text(errorMessage!!, color = AccentYellow, style = AppTypography.labelSmall, modifier = Modifier.padding(top = 8.dp))

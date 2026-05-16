@@ -53,8 +53,6 @@ class WorkoutViewModel : ViewModel() {
     var isRunning by mutableStateOf(false)
     var startTime by mutableLongStateOf(0L)
     var isSaving by mutableStateOf(false)
-
-    // Lógica do Temporizador de Descanso
     var restTimeLeft by mutableIntStateOf(0)
     private var restTimerJob: Job? = null
 
@@ -85,14 +83,9 @@ class WorkoutViewModel : ViewModel() {
     }
 
     fun formatTime(ms: Long): String {
-        val hours = TimeUnit.MILLISECONDS.toHours(ms)
         val minutes = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
         val seconds = TimeUnit.MILLISECONDS.toSeconds(ms) % 60
-        return if (hours > 0) {
-            String.format("%02d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            String.format("%02d:%02d", minutes, seconds)
-        }
+        return String.format("%02d:%02d", minutes, seconds)
     }
 
     fun updateSet(exerciseId: String, setIndex: Int, weight: String, reps: String) {
@@ -119,13 +112,9 @@ class WorkoutViewModel : ViewModel() {
                 if (exercise.id == exerciseId) {
                     val updatedSets = exercise.sets.toMutableList().apply {
                         val set = this[setIndex]
-                        val newCompletedState = !set.completed
-                        this[setIndex] = set.copy(completed = newCompletedState)
-
-                        // Se marcou como completo, inicia descanso
-                        if (newCompletedState) {
-                            startRestTimer()
-                        }
+                        val newState = !set.completed
+                        this[setIndex] = set.copy(completed = newState)
+                        if (newState) startRestTimer()
                     }
                     exercise.copy(sets = updatedSets)
                 } else exercise
@@ -143,6 +132,7 @@ class WorkoutViewModel : ViewModel() {
         val endTime = System.currentTimeMillis()
         val duration = TimeUnit.MILLISECONDS.toMinutes(elapsedTime).toInt()
 
+        // Correção: Parâmetros nomeados para resolver o erro de "Argument type mismatch"
         val session = WorkoutSession(
             routineId = routine.id,
             routineName = routine.name,
@@ -170,7 +160,7 @@ class WorkoutViewModel : ViewModel() {
     }
 }
 
-// --- ECRÃ PRINCIPAL DE TREINO ---
+// --- ECRÃ PRINCIPAL ---
 @Composable
 fun WorkoutTrackerScreen(routine: Routine, onFinish: () -> Unit) {
     val vm: WorkoutViewModel = viewModel()
@@ -183,8 +173,7 @@ fun WorkoutTrackerScreen(routine: Routine, onFinish: () -> Unit) {
         if (vm.isRunning) vm.runTimer()
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
-        // Cabeçalho Performance
+    Column(Modifier.fillMaxSize().background(BackgroundDark)) {
         Surface(
             color = SurfaceLevel1,
             modifier = Modifier.fillMaxWidth(),
@@ -193,69 +182,54 @@ fun WorkoutTrackerScreen(routine: Routine, onFinish: () -> Unit) {
             Column(Modifier.statusBarsPadding().padding(16.dp)) {
                 Row(
                     Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(text = routine.name.uppercase(), style = AppTypography.labelMedium, color = AccentBlue)
+                        Text(routine.name.uppercase(), style = AppTypography.labelMedium, color = AccentBlue)
                         Text(
-                            text = vm.formatTime(vm.elapsedTime),
+                            vm.formatTime(vm.elapsedTime),
                             style = AppTypography.displayLarge.copy(fontSize = 36.sp, fontFamily = FontFamily.Monospace)
                         )
                     }
-
                     if (vm.isSaving) {
                         CircularProgressIndicator(color = AccentBlue, modifier = Modifier.size(24.dp))
                     } else {
-                        TrainPrimaryButton(text = "CONCLUIR", onClick = { vm.finishWorkout(onFinish) })
+                        TrainPrimaryButton("CONCLUIR", onClick = { vm.finishWorkout(onFinish) })
                     }
                 }
 
-                // Barra de Descanso Animada
                 AnimatedVisibility(
                     visible = vm.restTimeLeft > 0,
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
                     Row(
-                        modifier = Modifier
+                        Modifier
                             .padding(top = 12.dp)
                             .fillMaxWidth()
                             .background(AccentBlue.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Timer, "Rest", tint = AccentBlue, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "DESCANSO: ${vm.restTimeLeft}s",
-                            style = AppTypography.labelMedium,
-                            color = AccentBlue
-                        )
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            text = "SALTAR",
-                            modifier = Modifier.clickable { vm.startRestTimer(0) },
-                            style = AppTypography.labelSmall,
-                            color = OutlineBorder
-                        )
+                        Icon(Icons.Default.Timer, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
+                        Text(" DESCANSO: ${vm.restTimeLeft}s", color = AccentBlue, style = AppTypography.labelMedium)
                     }
                 }
             }
         }
 
-        // Lista de Exercícios
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.weight(1f)
         ) {
             vm.activeRoutine?.let { active ->
-                items(active.exercises) { exercise ->
+                items(active.exercises) { ex ->
                     ExerciseActiveCard(
-                        exercise = exercise,
-                        onUpdateSet = { idx, w, r -> vm.updateSet(exercise.id, idx, w, r) },
-                        onToggleSet = { idx -> vm.toggleSet(exercise.id, idx) }
+                        exercise = ex,
+                        onUpdateSet = { idx, w, r -> vm.updateSet(ex.id, idx, w, r) },
+                        onToggleSet = { idx -> vm.toggleSet(ex.id, idx) }
                     )
                 }
             }
@@ -271,12 +245,11 @@ fun ExerciseActiveCard(
 ) {
     TrainCard {
         Column {
-            Text(text = exercise.name, style = AppTypography.headlineLarge.copy(fontSize = 20.sp))
+            Text(exercise.name, style = AppTypography.headlineLarge.copy(fontSize = 20.sp))
             Spacer(Modifier.height(16.dp))
 
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("SET", style = AppTypography.labelSmall, color = OutlineBorder, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-                Text("ANTERIOR", style = AppTypography.labelSmall, color = OutlineBorder, modifier = Modifier.weight(1.5f), textAlign = TextAlign.Center)
                 Text("KG", style = AppTypography.labelSmall, color = OutlineBorder, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Text("REPS", style = AppTypography.labelSmall, color = OutlineBorder, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(48.dp))
@@ -284,7 +257,7 @@ fun ExerciseActiveCard(
 
             Divider(color = OutlineBorder, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
 
-            exercise.sets.forEachIndexed { index, set ->
+            exercise.sets.forEachIndexed { idx, set ->
                 val rowColor = if (set.completed) AccentBlue.copy(alpha = 0.1f) else Color.Transparent
 
                 Row(
@@ -294,38 +267,24 @@ fun ExerciseActiveCard(
                         .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "${index + 1}",
-                        style = AppTypography.labelMedium,
-                        modifier = Modifier.width(40.dp),
-                        textAlign = TextAlign.Center
-                    )
-
-                    Text(
-                        text = "---",
-                        style = AppTypography.labelMedium,
-                        color = OutlineBorder,
-                        modifier = Modifier.weight(1.5f),
-                        textAlign = TextAlign.Center
-                    )
+                    Text("${idx + 1}", Modifier.width(40.dp), style = AppTypography.labelMedium, textAlign = TextAlign.Center)
 
                     WorkoutDataInput(
-                        value = if (set.weight > 0) set.weight.toString() else "",
-                        onValueChange = { onUpdateSet(index, it, set.reps.toString()) },
+                        value = if (set.weight > 0) "${set.weight}" else "",
+                        onValueChange = { onUpdateSet(idx, it, "${set.reps}") },
                         modifier = Modifier.weight(1f)
                     )
 
                     WorkoutDataInput(
-                        value = if (set.reps > 0) set.reps.toString() else "",
-                        onValueChange = { onUpdateSet(index, set.weight.toString(), it) },
+                        value = if (set.reps > 0) "${set.reps}" else "",
+                        onValueChange = { onUpdateSet(idx, "${set.weight}", it) },
                         modifier = Modifier.weight(1f)
                     )
 
                     IconButton(
-                        onClick = { onToggleSet(index) },
+                        onClick = { onToggleSet(idx) },
                         modifier = Modifier
-                            .size(40.dp)
-                            .padding(4.dp)
+                            .size(36.dp)
                             .background(if (set.completed) AccentBlue else SurfaceLevel0, RoundedCornerShape(4.dp))
                     ) {
                         Icon(
@@ -359,9 +318,9 @@ fun WorkoutDataInput(value: String, onValueChange: (String) -> Unit, modifier: M
                 textAlign = TextAlign.Center,
                 fontFamily = FontFamily.Monospace
             ),
-            cursorBrush = SolidColor(AccentBlue),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            cursorBrush = SolidColor(AccentBlue),
             singleLine = true
         )
     }

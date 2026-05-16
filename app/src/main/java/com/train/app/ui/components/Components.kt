@@ -1,8 +1,6 @@
 package com.train.app.ui.components
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -10,18 +8,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-
 import com.train.app.ui.theme.*
 
 @Composable
 fun TrainPrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Button(
         onClick = onClick,
-        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue, contentColor = Color.White),
+        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
         shape = RoundedCornerShape(4.dp),
         modifier = modifier.heightIn(min = 48.dp)
     ) {
-        Text(text = text, style = AppTypography.labelMedium)
+        Text(text = text.uppercase(), style = AppTypography.labelMedium, color = Color.White)
     }
 }
 
@@ -34,7 +31,7 @@ fun TrainSecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier =
         shape = RoundedCornerShape(4.dp),
         modifier = modifier.heightIn(min = 48.dp)
     ) {
-        Text(text = text, style = AppTypography.labelMedium)
+        Text(text = text.uppercase(), style = AppTypography.labelMedium, color = TextPrimary)
     }
 }
 
@@ -44,28 +41,26 @@ fun TrainCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
         color = SurfaceLevel1,
-        border = BorderStroke(1.dp, OutlineBorder)
+        border = BorderStroke(0.5.dp, OutlineBorder)
     ) {
-        Box(modifier = Modifier.padding(16.dp)) {
-            content()
-        }
+        Box(Modifier.padding(16.dp)) { content() }
     }
 }
 
 @Composable
 fun TrainChip(text: String, isWarning: Boolean = false) {
+    // Correção: Restaurado parâmetro isWarning para compatibilidade com o FeedScreen
     val bgColor = if (isWarning) ChipYellowBg else ChipPurpleBg
     val textColor = if (isWarning) AccentYellow else AccentPurple
 
     Surface(
         color = bgColor,
-        shape = RoundedCornerShape(50),
-        modifier = Modifier.padding(end = 8.dp)
+        shape = RoundedCornerShape(50)
     ) {
         Text(
             text = text.uppercase(),
-            style = AppTypography.labelMedium,
             color = textColor,
+            style = AppTypography.labelSmall,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         )
     }
@@ -77,15 +72,16 @@ fun TrainInput(value: String, onValueChange: (String) -> Unit, placeholder: Stri
         value = value,
         onValueChange = onValueChange,
         placeholder = { Text(placeholder, color = OutlineBorder) },
-        textStyle = AppTypography.bodyLarge.copy(color = TextPrimary),
-        singleLine = true,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = AccentBlue,
             unfocusedBorderColor = OutlineBorder,
+            cursorColor = AccentBlue,
             focusedContainerColor = BackgroundDark,
             unfocusedContainerColor = BackgroundDark,
-            cursorColor = AccentBlue
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary
         ),
+        textStyle = AppTypography.bodyLarge,
         shape = RoundedCornerShape(4.dp),
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
     )

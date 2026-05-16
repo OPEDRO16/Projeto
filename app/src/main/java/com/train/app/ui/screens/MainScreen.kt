@@ -1,9 +1,12 @@
 package com.train.app.ui.screens
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import com.train.app.navigation.Screen
@@ -16,43 +19,108 @@ fun MainScreen() {
     val navController = rememberNavController()
     var activeWorkoutRoutine by remember { mutableStateOf<Routine?>(null) }
 
+    // Estado reativo para monitorizar o utilizador em tempo real
+    var currentUser by remember { mutableStateOf(FirebaseManager.auth.currentUser) }
+
+    // Listener para reagir a mudanças de login/logout imediatamente
+    DisposableEffect(Unit) {
+        val listener = { auth: com.google.firebase.auth.FirebaseAuth ->
+            currentUser = auth.currentUser
+        }
+        FirebaseManager.auth.addAuthStateListener(listener)
+        onDispose { FirebaseManager.auth.removeAuthStateListener(listener) }
+    }
+
+    // Efeito de redirecionamento para o Login quando o utilizador sai
+    LaunchedEffect(currentUser) {
+        if (currentUser == null) {
+            navController.navigate(Screen.Login.route) {
+                popUpTo(0) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
+
     Scaffold(
         bottomBar = {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
-            // Esconde a barra no Login e durante o Treino Ativo para foco total
-            if (currentRoute != Screen.Login.route && activeWorkoutRoutine == null) {
+
+            // Só mostra a barra inferior se logado e fora de ecrãs de foco (Login/Treino)
+            if (currentUser != null && currentRoute != Screen.Login.route && activeWorkoutRoutine == null) {
                 BottomNavBar(navController)
             }
         },
         containerColor = BackgroundDark
     ) { innerPadding ->
-        NavHost(navController, Screen.Login.route, Modifier.padding(innerPadding)) {
+        NavHost(
+            navController = navController,
+            startDestination = if (currentUser != null) Screen.Home.route else Screen.Login.route,
+            modifier = Modifier.padding(innerPadding)
+        ) {
             composable(Screen.Login.route) {
-                LoginScreen { navController.navigate(Screen.Home.route) { popUpTo(Screen.Login.route) { inclusive = true } } }
+                LoginScreen {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                }
             }
             composable(Screen.Home.route) { HomeScreen() }
             composable(Screen.Feed.route) { FeedScreen() }
             composable(Screen.Routines.route) {
-                RoutinesScreen(onStartWorkout = { routine ->
-                    activeWorkoutRoutine = routine
-                })
+                RoutinesScreen(onStartWorkout = { routine -> activeWorkoutRoutine = routine })
             }
             composable(Screen.Chat.route) { ChatScreen() }
             composable(Screen.Profile.route) { ProfileScreen() }
         }
 
-        // Overlay do Workout Tracker (Inicia quando activeWorkoutRoutine não é nulo)
+        // Overlay de Treino Ativo (HUD de Performance)
         activeWorkoutRoutine?.let { routine ->
             WorkoutTrackerScreen(
                 routine = routine,
-                onFinish = { activeWorkoutRoutine = null } // Volta ao estado normal
+                onFinish = { activeWorkoutRoutine = null }
             )
         }
     }
 }
 
 @Composable
-fun BottomNavBar(x0: NavHostController) {
-    TODO("Not yet implemented")
+fun BottomNavBar(navController: NavHostController) {
+    val items = listOf(
+        NavItem(Screen.Home.route, Icons.Default.Home, "Home"),
+        NavItem(Screen.Feed.route, Icons.Default.DynamicFeed, "Feed"),
+        NavItem(Screen.Routines.route, Icons.Default.FitnessCenter, "Treinar"),
+        NavItem(Screen.Chat.route, Icons.Default.ChatBubble, "Chat"),
+        NavItem(Screen.Profile.route, Icons.Default.Person, "Perfil")
+    )
+
+    NavigationBar(containerColor = SurfaceLevel1) {
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = navBackStackEntry?.destination?.route
+        items.forEach { item ->
+            NavigationBarItem(
+                icon = { Icon(item.icon, item.title) },
+                label = { Text(item.title) },
+                selected = currentRoute == item.route,
+                onClick = {
+                    if (currentRoute != item.route) {
+                        navController.navigate(item.route) {
+                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = AccentBlue,
+                    unselectedIconColor = OutlineBorder,
+                    selectedTextColor = AccentBlue,
+                    unselectedTextColor = OutlineBorder,
+                    indicatorColor = SurfaceLevel1
+                )
+            )
+        }
+    }
 }
+
+data class NavItem(val route: String, val icon: ImageVector, val title: String)
