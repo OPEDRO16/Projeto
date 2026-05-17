@@ -56,7 +56,7 @@ fun ChatScreen(
         FirebaseManager.firestore.collection("users").document(currentUser.uid)
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null && snapshot.exists()) {
-                    userProfile = snapshot.toObject(UserProfile::class.java)
+                    userProfile = snapshot.toObject(UserProfile::class.java)?.apply { id = snapshot.id }
                 }
             }
     }
@@ -72,7 +72,9 @@ fun ChatScreen(
             .whereIn("id", friendsUids)
             .get()
             .addOnSuccessListener { snap ->
-                friendsProfiles = snap.toObjects(UserProfile::class.java)
+                friendsProfiles = snap.documents.mapNotNull { doc ->
+                    doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
+                }
             }
     }
 
@@ -258,7 +260,7 @@ fun ChatScreen(
             title = {
                 Text(
                     "Nova Mensagem",
-                    color = Color.White,
+                    color = TextWhite,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
                 )
@@ -287,7 +289,7 @@ fun ChatScreen(
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
-                            Text("Criar Grupo", style = AppTypography.bodyLarge, color = Color.White)
+                            Text("Criar Grupo", style = AppTypography.bodyLarge, color = TextWhite)
                             Text("Treinar e partilhar rotinas em conjunto", style = AppTypography.labelSmall, color = OutlineBorder)
                         }
                     }
@@ -315,7 +317,7 @@ fun ChatScreen(
                                 ) {
                                     UserAvatar(photoUrl = friend.photoUrl, modifier = Modifier.size(36.dp))
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Text(friend.name, style = AppTypography.bodyMedium, color = Color.White)
+                                    Text(friend.name, style = AppTypography.bodyMedium, color = TextWhite)
                                 }
                             }
                         }
@@ -341,7 +343,7 @@ fun ChatScreen(
             title = {
                 Text(
                     "Criar Novo Grupo",
-                    color = Color.White,
+                    color = TextWhite,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
                 )
@@ -387,7 +389,7 @@ fun ChatScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     UserAvatar(photoUrl = friend.photoUrl, modifier = Modifier.size(36.dp))
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Text(friend.name, style = AppTypography.bodyMedium, color = Color.White)
+                                    Text(friend.name, style = AppTypography.bodyMedium, color = TextWhite)
                                 }
                             }
                         }
@@ -457,7 +459,7 @@ fun RecentChatItem(
                 .get()
                 .addOnSuccessListener { doc ->
                     if (doc.exists()) {
-                        contactProfile = doc.toObject(UserProfile::class.java)
+                        contactProfile = doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
                     }
                 }
         }
@@ -505,7 +507,7 @@ fun RecentChatItem(
             Text(
                 text = displayName,
                 style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                color = Color.White
+                color = TextWhite
             )
             Spacer(modifier = Modifier.height(4.dp))
             val previewText = if (room.lastMessageSender != null && room.isGroup) {

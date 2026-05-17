@@ -77,6 +77,7 @@ import com.train.app.ui.theme.BackgroundDark
 import com.train.app.ui.theme.OutlineBorder
 import com.train.app.ui.theme.SurfaceLevel0
 import com.train.app.ui.theme.SurfaceLevel1
+import com.train.app.ui.theme.TextPrimary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -138,7 +139,7 @@ fun WorkoutSummaryScreen(
             FirebaseManager.firestore.collection("users").document(currentAuthId)
                 .addSnapshotListener { snapshot, _ ->
                     if (snapshot != null && snapshot.exists()) {
-                        currentUserProfile = snapshot.toObject(UserProfile::class.java)
+                        currentUserProfile = snapshot.toObject(UserProfile::class.java)?.apply { id = snapshot.id }
                     }
                 }
         }
@@ -245,14 +246,14 @@ fun WorkoutSummaryScreen(
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Voltar",
-                        tint = Color.White
+                        tint = TextPrimary
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Detalhe de Treinamento",
                     style = AppTypography.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp),
-                    color = Color.White
+                    color = TextPrimary
                 )
             }
         }
@@ -305,7 +306,7 @@ fun WorkoutSummaryScreen(
                             Text(
                                 text = userName.ifBlank { "atleta" },
                                 style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp),
-                                color = Color.White
+                                color = TextPrimary
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
@@ -321,7 +322,7 @@ fun WorkoutSummaryScreen(
                     Text(
                         text = currentSession.routineName.ifBlank { "Treinamento" },
                         style = AppTypography.headlineLarge.copy(fontWeight = FontWeight.Bold, fontSize = 24.sp),
-                        color = Color.White,
+                        color = TextPrimary,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
@@ -340,7 +341,7 @@ fun WorkoutSummaryScreen(
                             Text(
                                 text = durationText,
                                 style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold, fontSize = 18.sp),
-                                color = Color.White
+                                color = TextPrimary
                             )
                         }
                         Column(modifier = Modifier.weight(1.2f)) {
@@ -349,7 +350,7 @@ fun WorkoutSummaryScreen(
                             Text(
                                 text = volumeText,
                                 style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold, fontSize = 18.sp),
-                                color = Color.White
+                                color = TextPrimary
                             )
                         }
                         Column(modifier = Modifier.weight(0.8f)) {
@@ -358,7 +359,7 @@ fun WorkoutSummaryScreen(
                             Text(
                                 text = completedSets.toString(),
                                 style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold, fontSize = 18.sp),
-                                color = Color.White
+                                color = TextPrimary
                             )
                         }
                     }
@@ -392,19 +393,19 @@ fun WorkoutSummaryScreen(
                                         }
                                     }
                                 }
-                                .padding(vertical = 6.dp, horizontal = 12.dp)
+                                 .padding(vertical = 6.dp, horizontal = 12.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.FavoriteBorder,
                                 contentDescription = "Gostar",
-                                tint = if (isLiked) AccentYellow else Color.White.copy(alpha = 0.9f),
+                                tint = if (isLiked) AccentYellow else TextPrimary,
                                 modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "$likesCount",
                                 style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
+                                color = TextPrimary
                             )
                         }
 
@@ -423,14 +424,14 @@ fun WorkoutSummaryScreen(
                             Icon(
                                 imageVector = Icons.Default.ChatBubbleOutline,
                                 contentDescription = "Comentários",
-                                tint = Color.White.copy(alpha = 0.9f),
+                                tint = TextPrimary,
                                 modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "$commentsCount",
                                 style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
+                                color = TextPrimary
                             )
                         }
 
@@ -447,12 +448,12 @@ fun WorkoutSummaryScreen(
                             Icon(
                                 imageVector = Icons.Default.Share,
                                 contentDescription = "Partilhar",
-                                tint = Color.White.copy(alpha = 0.9f),
+                                tint = TextPrimary,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
                     }
-                    HorizontalDivider(color = Color(0xFF232222), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(color = OutlineBorder.copy(alpha = 0.2f), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
                 }
 
                 // Divisão Muscular
@@ -482,7 +483,7 @@ fun WorkoutSummaryScreen(
                                     Text(
                                         text = muscle,
                                         style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White
+                                        color = TextPrimary
                                     )
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Row(
@@ -592,17 +593,17 @@ fun WorkoutSummaryScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
+                                 Text(
                                     text = "${setIdx + 1}",
                                     style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = Color.White,
+                                    color = TextPrimary,
                                     modifier = Modifier.weight(0.3f)
                                 )
                                 val weightStr = if (set.weight % 1f == 0f) set.weight.roundToInt().toString() else String.format(Locale.US, "%.1f", set.weight)
                                 Text(
                                     text = "$weightStr kg x ${set.reps}",
                                     style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Normal),
-                                    color = Color.White,
+                                    color = TextPrimary,
                                     modifier = Modifier.weight(0.7f)
                                 )
                             }
@@ -630,7 +631,7 @@ fun WorkoutSummaryScreen(
                 Text(
                     text = "Partilhar Post",
                     style = AppTypography.headlineLarge.copy(fontSize = 20.sp),
-                    color = Color.White,
+                    color = TextPrimary,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -734,7 +735,7 @@ private fun SummaryPrCard(pr: SummaryPr) {
             Text(
                 text = pr.exerciseName,
                 style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                color = Color.White
+                color = TextPrimary
             )
             Spacer(modifier = Modifier.height(8.dp))
             FlowRow(

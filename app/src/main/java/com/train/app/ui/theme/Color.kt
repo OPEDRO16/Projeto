@@ -1,6 +1,9 @@
 package com.train.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 
 // ─── Performance Minimalist Design System ───────────────────────────────────
 // Exact values from DESIGN.md specification
@@ -34,18 +37,71 @@ val TransparentPurple       = Color(0x2974478A)   // 16% opacity
 val ChipPurpleBg            = Color(0x3374478A)   // 20% opacity
 val ChipYellowBg            = Color(0x33F3D869)   // 20% opacity
 
-// ─── Legacy aliases ──────────────────────────────────────────────────────────
-val BackgroundDark  = Surface
-val SurfaceLevel0   = SurfaceContainerLowest
-val SurfaceLevel1   = Color(0xFF252324)            // Level 1 card surface per DESIGN.md
-val TextPrimary     = OnSurface
-val AccentBlue      = BluePrimary
-val AccentYellow    = YellowWarning
-val AccentPurple    = PurpleRecovery
+// ─── Legacy aliases with Dynamic Theme Getters ─────────────────────────────────
+var currentThemeName by mutableStateOf("DARK")
+var currentCustomAccentColor by mutableStateOf("#0A62D0")
 
-// OutlineBorder: used for muted label text (#968F92), matches Outline token
-// Previously was 15%-opacity white which was nearly invisible as text color.
-val OutlineBorder   = Outline                      // #968F92 — visible muted grey
+private fun safeParseColor(hex: String, fallback: Color): Color {
+    return try {
+        Color(android.graphics.Color.parseColor(hex))
+    } catch (e: Exception) {
+        fallback
+    }
+}
 
-// Fine 1px divider lines (very subtle per DESIGN.md "5-15% opacity white")
-val DividerColor    = Color(0x1AE0E5E9)            // 10% opacity white
+val BackgroundDark: Color
+    get() = when (currentThemeName) {
+        "LIGHT" -> Color.White
+        "CUSTOM" -> Color(0xFF111116) // deep obsidian dark
+        else -> Surface
+    }
+
+val SurfaceLevel0: Color
+    get() = when (currentThemeName) {
+        "LIGHT" -> Color(0xFFF5F5F5)
+        "CUSTOM" -> Color(0xFF0F0E0E)
+        else -> SurfaceContainerLowest
+    }
+
+val SurfaceLevel1: Color
+    get() = when (currentThemeName) {
+        "LIGHT" -> Color(0xFFEAEAEA)
+        "CUSTOM" -> Color(0xFF1A1A24) // custom graphite card surface
+        else -> Color(0xFF252324)
+    }
+
+val TextPrimary: Color
+    get() = when (currentThemeName) {
+        "LIGHT" -> Color(0xFF141313)
+        "CUSTOM" -> Color(0xFFE2E8F0)
+        else -> OnSurface
+    }
+
+val TextWhite: Color
+    get() = if (currentThemeName == "LIGHT") Color(0xFF141313) else Color.White
+
+val AccentBlue: Color
+    get() = when (currentThemeName) {
+        "CUSTOM" -> safeParseColor(currentCustomAccentColor, BluePrimary)
+        else -> BluePrimary
+    }
+
+val AccentYellow: Color
+    get() = YellowWarning
+
+val AccentPurple: Color
+    get() = PurpleRecovery
+
+val OutlineBorder: Color
+    get() = when (currentThemeName) {
+        "LIGHT" -> Color(0xFF69706D)
+        "CUSTOM" -> Color(0xFF333344)
+        else -> Outline
+    }
+
+val DividerColor: Color
+    get() = when (currentThemeName) {
+        "LIGHT" -> Color(0x1A141313)
+        "CUSTOM" -> Color(0x1AE0E5E9)
+        else -> Color(0x1AE0E5E9)
+    }

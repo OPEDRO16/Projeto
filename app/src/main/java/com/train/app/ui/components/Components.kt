@@ -37,7 +37,7 @@ fun TrainPrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = M
         shape = AppShapes.small,
         modifier = modifier.heightIn(min = 48.dp)
     ) {
-        Text(text = text.uppercase(), style = AppTypography.labelMedium, color = Color.White)
+        Text(text = text.uppercase(), style = AppTypography.labelMedium, color = TextWhite)
     }
 }
 

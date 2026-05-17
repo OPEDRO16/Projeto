@@ -26,7 +26,7 @@ val AppTypography = Typography(
         fontWeight = FontWeight.Bold,
         fontSize = 32.sp,
         lineHeight = 40.sp,
-        color = Color(0xFFE6E1E1)
+        color = Color.Unspecified
     ),
     // headline-lg-mobile: 28px / 700 / 36px
     headlineMedium = TextStyle(
@@ -34,7 +34,7 @@ val AppTypography = Typography(
         fontWeight = FontWeight.Bold,
         fontSize = 28.sp,
         lineHeight = 36.sp,
-        color = Color(0xFFE6E1E1)
+        color = Color.Unspecified
     ),
     // headline-md: 24px / 600 / 32px
     headlineSmall = TextStyle(
@@ -42,7 +42,7 @@ val AppTypography = Typography(
         fontWeight = FontWeight.SemiBold,
         fontSize = 24.sp,
         lineHeight = 32.sp,
-        color = Color(0xFFE6E1E1)
+        color = Color.Unspecified
     ),
     // body-lg: 18px / 400 / 28px
     bodyLarge = TextStyle(
@@ -50,7 +50,7 @@ val AppTypography = Typography(
         fontWeight = FontWeight.Normal,
         fontSize = 18.sp,
         lineHeight = 28.sp,
-        color = Color(0xFFE6E1E1)
+        color = Color.Unspecified
     ),
     // body-md: 16px / 400 / 24px
     bodyMedium = TextStyle(
@@ -58,14 +58,14 @@ val AppTypography = Typography(
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
-        color = Color(0xFFE6E1E1)
+        color = Color.Unspecified
     ),
     bodySmall = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
-        color = Color(0xFFCDC4C8)
+        color = Color.Unspecified
     ),
     // label-md: JetBrains Mono 14px / 500 / 0.05em
     labelLarge = TextStyle(
@@ -73,7 +73,7 @@ val AppTypography = Typography(
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
-        color = Color(0xFFCDC4C8)
+        color = Color.Unspecified
     ),
     // label-md (data): JetBrains Mono 14px / 500 / 0.05em
     labelMedium = TextStyle(
@@ -82,7 +82,7 @@ val AppTypography = Typography(
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.7.sp,      // ≈ 0.05em at 14sp
-        color = Color(0xFFCDC4C8)
+        color = Color.Unspecified
     ),
     // label-sm: JetBrains Mono 12px / 500 / 0.05em
     labelSmall = TextStyle(
@@ -91,6 +91,6 @@ val AppTypography = Typography(
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.6.sp,      // ≈ 0.05em at 12sp
-        color = Color(0xFF968F92)
+        color = Color.Unspecified
     )
 )

@@ -76,7 +76,10 @@ import com.train.app.ui.theme.OutlineBorder
 import com.train.app.ui.theme.SurfaceLevel0
 import com.train.app.ui.theme.SurfaceLevel1
 import com.train.app.ui.theme.TextPrimary
+import com.train.app.ui.theme.TextWhite
 import com.train.app.viewmodels.WorkoutViewModel
+import com.train.app.data.models.ExerciseLibraryItem
+import com.train.app.data.FirebaseManager
 
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.getValue
@@ -98,19 +101,39 @@ fun WorkoutTrackerScreen(
     var query by remember { mutableStateOf("") }
     var selectedMuscle by remember { mutableStateOf("All") }
 
-    val allExercises = remember { ExerciseLibraryRepository.exercises }
-    val muscleFilters = remember(allExercises) {
-        listOf("All") + allExercises.map { it.primaryMuscle }.distinct().sorted()
+    val currentUserId = FirebaseManager.auth.currentUser?.uid
+    var customExercises by remember { mutableStateOf<List<ExerciseLibraryItem>>(emptyList()) }
+    LaunchedEffect(currentUserId) {
+        if (currentUserId != null) {
+            FirebaseManager.firestore.collection("users")
+                .document(currentUserId)
+                .collection("custom_exercises")
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    if (snapshot != null) {
+                        customExercises = snapshot.toObjects(ExerciseLibraryItem::class.java)
+                    }
+                }
+        }
     }
 
-    val filteredExercises = remember(query, selectedMuscle) {
-        ExerciseLibraryRepository.filterExercises(
-            query = query,
-            primaryMuscle = selectedMuscle,
-            equipment = "All",
-            difficulty = "All",
-            category = "All"
-        )
+    val baseExercises = remember { ExerciseLibraryRepository.exercises }
+    val combinedExercises = remember(baseExercises, customExercises) {
+        baseExercises + customExercises
+    }
+
+    val muscleFilters = remember(combinedExercises) {
+        listOf("All") + combinedExercises.map { it.primaryMuscle }.distinct().sorted()
+    }
+
+    val filteredExercises = remember(combinedExercises, query, selectedMuscle) {
+        combinedExercises.filter { exercise ->
+            val matchesQuery = query.isBlank() ||
+                    exercise.name.contains(query, ignoreCase = true) ||
+                    exercise.primaryMuscle.contains(query, ignoreCase = true)
+            val matchesMuscle = selectedMuscle == "All" || exercise.primaryMuscle == selectedMuscle
+            matchesQuery && matchesMuscle
+        }
     }
 
     val activeRoutine = workoutViewModel.activeRoutine
@@ -140,7 +163,7 @@ fun WorkoutTrackerScreen(
     if (showCancelDialog) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showCancelDialog = false },
-            title = { Text("Cancelar Treinamento?", color = Color.White) },
+            title = { Text("Cancelar Treinamento?", color = TextPrimary) },
             text = { Text("Tens a certeza que desejas cancelar o treinamento atual? Todos os dados não guardados serão perdidos.", color = OutlineBorder) },
             confirmButton = {
                 androidx.compose.material3.TextButton(
@@ -154,7 +177,7 @@ fun WorkoutTrackerScreen(
             },
             dismissButton = {
                 androidx.compose.material3.TextButton(onClick = { showCancelDialog = false }) {
-                    Text("VOLTAR", color = Color.White)
+                    Text("VOLTAR", color = AccentBlue)
                 }
             },
             containerColor = SurfaceLevel1
@@ -198,7 +221,7 @@ fun WorkoutTrackerScreen(
                             Text(
                                 text = "Treinamento",
                                 style = AppTypography.headlineLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold),
-                                color = Color.White
+                                color = TextPrimary
                             )
                         }
 
@@ -213,7 +236,7 @@ fun WorkoutTrackerScreen(
                                     onClick = { workoutViewModel.finishWorkout(onFinish) },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = AccentBlue,
-                                        contentColor = Color.White
+                                        contentColor = TextWhite
                                     ),
                                     shape = RoundedCornerShape(99.dp),
                                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
@@ -249,7 +272,7 @@ fun WorkoutTrackerScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "${totalVolume.toInt()} kg",
-                                    style = AppTypography.headlineLarge.copy(fontSize = 18.sp, color = Color.White)
+                                    style = AppTypography.headlineLarge.copy(fontSize = 18.sp, color = TextPrimary)
                                 )
                             }
                             Column(horizontalAlignment = Alignment.Start) {
@@ -257,7 +280,7 @@ fun WorkoutTrackerScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "$completedSetsCount",
-                                    style = AppTypography.headlineLarge.copy(fontSize = 18.sp, color = Color.White)
+                                    style = AppTypography.headlineLarge.copy(fontSize = 18.sp, color = TextPrimary)
                                 )
                             }
                         }
@@ -296,7 +319,7 @@ fun WorkoutTrackerScreen(
                                     Text(
                                         text = "Novo PR em ${pr.exerciseName}: ${pr.labels.joinToString()}",
                                         style = AppTypography.bodyMedium,
-                                        color = Color.White
+                                        color = TextPrimary
                                     )
                                 }
                             }
@@ -402,7 +425,7 @@ fun WorkoutTrackerScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(horizontal = 14.dp, vertical = 14.dp),
-                                        textStyle = AppTypography.bodyMedium.copy(color = Color.White),
+                                        textStyle = AppTypography.bodyMedium.copy(color = TextPrimary),
                                         cursorBrush = SolidColor(AccentBlue),
                                         decorationBox = { innerTextField ->
                                             if (query.isBlank()) {
@@ -461,7 +484,7 @@ fun WorkoutTrackerScreen(
                                     Text(
                                         text = libraryItem.name,
                                         style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White
+                                        color = TextPrimary
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
@@ -607,7 +630,7 @@ private fun ExerciseActiveCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
-            textStyle = AppTypography.bodyMedium.copy(color = Color.White),
+            textStyle = AppTypography.bodyMedium.copy(color = TextPrimary),
             cursorBrush = SolidColor(AccentBlue),
             decorationBox = { innerTextField ->
                 if (notes.isEmpty()) {
@@ -723,7 +746,7 @@ private fun ExerciseActiveCard(
             onClick = onAddSet,
             colors = ButtonDefaults.buttonColors(
                 containerColor = SurfaceLevel1,
-                contentColor = Color.White
+                contentColor = TextPrimary
             ),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier.fillMaxWidth().height(40.dp)
@@ -758,7 +781,7 @@ private fun WorkoutTrackerInput(
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             textStyle = AppTypography.bodyMedium.copy(
-                color = Color.White,
+                color = TextPrimary,
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Bold
             ),
@@ -801,7 +824,7 @@ private fun SwipeableSetRow(
             Icon(
                 imageVector = Icons.Default.Delete,
                 contentDescription = "Remover Série",
-                tint = Color.White,
+                tint = TextWhite,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -834,7 +857,7 @@ private fun SwipeableSetRow(
         ) {
             // Set Number (Cycles through types when clicked!)
             val badgeColor = when (set.type) {
-                SetType.NORMAL -> Color.White
+                SetType.NORMAL -> TextPrimary
                 SetType.WARMUP -> AccentYellow
                 SetType.FAILURE -> Color(0xFFE05A5A)
                 SetType.DROPSET -> Color(0xFF6AA8FF)
@@ -928,7 +951,7 @@ private fun SwipeableSetRow(
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Concluído",
-                            tint = Color.White,
+                            tint = TextWhite,
                             modifier = Modifier.size(14.dp)
                         )
                     }

@@ -63,15 +63,15 @@ fun PostCommentsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Comentários", style = AppTypography.headlineLarge.copy(fontSize = 20.sp)) },
+                title = { Text("Comentários", style = AppTypography.headlineLarge.copy(fontSize = 20.sp), color = TextPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = Color.White)
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = BackgroundDark,
-                    titleContentColor = Color.White
+                    titleContentColor = TextPrimary
                 )
             )
         },
@@ -163,7 +163,7 @@ fun CommentItem(comment: Comment) {
             .get()
             .addOnSuccessListener { doc ->
                 if (doc.exists()) {
-                    commenterProfile = doc.toObject(UserProfile::class.java)
+                    commenterProfile = doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
                 }
             }
     }
@@ -177,10 +177,10 @@ fun CommentItem(comment: Comment) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = comment.userName,
+                    text = commenterProfile?.name ?: comment.userName,
                     style = AppTypography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = TextPrimary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(

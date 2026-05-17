@@ -84,7 +84,9 @@ fun ConversationScreen(
                 .whereIn("id", memberUids)
                 .get()
                 .addOnSuccessListener { snap ->
-                    groupMembersProfiles = snap.toObjects(UserProfile::class.java)
+                    groupMembersProfiles = snap.documents.mapNotNull { doc ->
+                        doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
+                    }
                 }
         }
     }
@@ -97,7 +99,9 @@ fun ConversationScreen(
                 .whereIn("id", friendUids)
                 .get()
                 .addOnSuccessListener { snap ->
-                    myFriendsProfiles = snap.toObjects(UserProfile::class.java)
+                    myFriendsProfiles = snap.documents.mapNotNull { doc ->
+                        doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
+                    }
                 }
         }
     }
@@ -138,7 +142,7 @@ fun ConversationScreen(
             FirebaseManager.firestore.collection("users").document(currentUser.uid)
                 .addSnapshotListener { snapshot, _ ->
                     if (snapshot != null && snapshot.exists()) {
-                        myProfile = snapshot.toObject(UserProfile::class.java)
+                        myProfile = snapshot.toObject(UserProfile::class.java)?.apply { id = snapshot.id }
                     }
                 }
         }
@@ -210,7 +214,7 @@ fun ConversationScreen(
                 .get()
                 .addOnSuccessListener { doc ->
                     if (doc.exists()) {
-                        contactProfile = doc.toObject(UserProfile::class.java)
+                        contactProfile = doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
                     }
                 }
         }
@@ -248,7 +252,7 @@ fun ConversationScreen(
                             Text(
                                 text = headerTitle,
                                 style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp),
-                                color = Color.White
+                                color = TextWhite
                             )
                             if (room?.isGroup == true) {
                                 Text(
@@ -262,12 +266,12 @@ fun ConversationScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = Color.White)
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = TextWhite)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = BackgroundDark,
-                    titleContentColor = Color.White
+                    titleContentColor = TextWhite
                 )
             )
         },
@@ -296,6 +300,7 @@ fun ConversationScreen(
                         message = msg,
                         isMe = isMe,
                         isGroup = room?.isGroup == true,
+                        currentUserUid = currentUser?.uid.orEmpty(),
                         onImportRoutine = { routineId, senderId ->
                             val myUid = currentUser?.uid
                             if (myUid != null) {
@@ -330,6 +335,62 @@ fun ConversationScreen(
                                             Toast.makeText(context, "Rotina indisponível ou apagada.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
+                            }
+                        },
+                        onImportCustomExercise = { exerciseId, senderId, rawContent ->
+                            val myUid = currentUser?.uid
+                            val tier = myProfile?.subscriptionTier ?: "FREE"
+                            if (tier == "FREE") {
+                                Toast.makeText(context, "A importação de exercícios partilhados requer o plano PRO! 👑", Toast.LENGTH_LONG).show()
+                            } else if (myUid != null) {
+                                if (rawContent.startsWith("EX_SERIALIZED|")) {
+                                    val exItem = deserializeExercise(rawContent)
+                                    if (exItem != null) {
+                                        FirebaseManager.firestore.collection("users")
+                                            .document(myUid)
+                                            .collection("custom_exercises")
+                                            .document(exerciseId)
+                                            .set(exItem)
+                                            .addOnSuccessListener {
+                                                Toast.makeText(context, "Exercício \"${exItem.name}\" adicionado à tua biblioteca!", Toast.LENGTH_SHORT).show()
+                                            }
+                                            .addOnFailureListener { e ->
+                                                Toast.makeText(context, "Erro ao guardar: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                    } else {
+                                        Toast.makeText(context, "Erro ao processar dados do exercício.", Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    // Fallback for old messages
+                                    FirebaseManager.firestore.collection("users")
+                                        .document(senderId)
+                                        .collection("custom_exercises")
+                                        .document(exerciseId)
+                                        .get()
+                                        .addOnSuccessListener { doc ->
+                                            if (doc.exists()) {
+                                                val exItem = doc.toObject(com.train.app.data.models.ExerciseLibraryItem::class.java)
+                                                if (exItem != null) {
+                                                    FirebaseManager.firestore.collection("users")
+                                                        .document(myUid)
+                                                        .collection("custom_exercises")
+                                                        .document(exerciseId)
+                                                        .set(exItem)
+                                                        .addOnSuccessListener {
+                                                            Toast.makeText(context, "Exercício \"${exItem.name}\" adicionado à tua biblioteca!", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                        .addOnFailureListener { e ->
+                                                            Toast.makeText(context, "Erro ao guardar: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                }
+                                            } else {
+                                                Toast.makeText(context, "Exercício original não encontrado.", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                        .addOnFailureListener { e ->
+                                            Toast.makeText(context, "Erro ao carregar: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                }
                             }
                         },
                         onOpenPostComments = onOpenPostComments,
@@ -404,7 +465,7 @@ fun ConversationScreen(
                 Text(
                     text = "Partilhar Rotina",
                     style = AppTypography.headlineLarge.copy(fontSize = 20.sp),
-                    color = Color.White,
+                    color = TextWhite,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -454,7 +515,7 @@ fun ConversationScreen(
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(r.name, style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                                    Text(r.name, style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = TextWhite)
                                     Text("${r.exercises.size} exercícios", style = AppTypography.labelSmall, color = OutlineBorder)
                                 }
                             }
@@ -487,14 +548,14 @@ fun ConversationScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { showGroupDetails = false }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = Color.White)
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = TextWhite)
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
                                 text = "Membros do Grupo",
                                 style = AppTypography.headlineLarge.copy(fontSize = 20.sp),
-                                color = Color.White,
+                                color = TextWhite,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
@@ -567,7 +628,7 @@ fun ConversationScreen(
                                     Text(
                                         text = member.name,
                                         style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White
+                                        color = TextWhite
                                     )
                                     Text(
                                         text = member.email,
@@ -779,7 +840,7 @@ fun ConversationScreen(
                 Text(
                     text = "Adicionar ao Grupo",
                     style = AppTypography.headlineLarge.copy(fontSize = 20.sp),
-                    color = Color.White,
+                    color = TextWhite,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -823,7 +884,7 @@ fun ConversationScreen(
                                 Text(
                                     text = friend.name,
                                     style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = Color.White,
+                                    color = TextWhite,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Button(
@@ -860,14 +921,17 @@ fun MessageRow(
     message: Message,
     isMe: Boolean,
     isGroup: Boolean,
+    currentUserUid: String,
     onImportRoutine: (String, String) -> Unit,
+    onImportCustomExercise: (String, String, String) -> Unit,
     onOpenPostComments: (String) -> Unit,
     onOpenWorkoutDetail: (String, String?) -> Unit,
     onOpenExerciseDetail: (String) -> Unit
 ) {
+    val context = LocalContext.current
     val align = if (isMe) Alignment.End else Alignment.Start
     val bubbleColor = if (isMe) AccentBlue else SurfaceLevel1
-    val txtColor = Color.White
+    val txtColor = if (isMe) Color.White else TextWhite
     val timeString = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp))
 
     Column(
@@ -915,7 +979,7 @@ fun MessageRow(
                     Text(
                         text = message.sharedRoutineName.orEmpty(),
                         style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
+                        color = if (isMe) Color.White else TextWhite
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -961,33 +1025,70 @@ fun MessageRow(
                 }
             } else if (message.sharedPostId != null) {
                 val isExercise = message.sharedPostId.startsWith("EXERCISE:")
-                if (isExercise) {
-                    val exerciseName = message.sharedPostId.removePrefix("EXERCISE:")
+                val isCustomExercise = message.sharedPostId.startsWith("EXERCISE_CUSTOM:")
+                if (isExercise || isCustomExercise) {
+                    val exerciseId: String
+                    val senderId: String
+                    val displayName: String
+                    if (isCustomExercise) {
+                        val parts = message.sharedPostId.split(":")
+                        exerciseId = parts.getOrNull(1).orEmpty()
+                        senderId = parts.getOrNull(2).orEmpty()
+                        displayName = message.sharedPostAuthorName ?: "Exercício Personalizado"
+                    } else {
+                        exerciseId = message.sharedPostId.removePrefix("EXERCISE:")
+                        senderId = message.senderId
+                        displayName = message.sharedPostAuthorName ?: exerciseId
+                    }
+
+                    val rawContent = message.sharedPostContent.orEmpty()
+                    val isSerialized = rawContent.startsWith("EX_SERIALIZED|")
+                    val displayDescription = if (isSerialized) {
+                        val deserialized = deserializeExercise(rawContent)
+                        if (deserialized != null) {
+                            "Músculo: ${deserialized.primaryMuscle} • Equipamento: ${deserialized.equipment}"
+                        } else {
+                            "Vê a anatomia, músculos ativados e execução deste exercício."
+                        }
+                    } else {
+                        rawContent
+                    }
+
+                    val targetDetailId = if (isCustomExercise) {
+                        if (isSerialized) {
+                            "${rawContent}_by_${senderId}"
+                        } else {
+                            "${exerciseId}_by_${senderId}"
+                        }
+                    } else {
+                        exerciseId
+                    }
+
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                onOpenExerciseDetail(exerciseName)
+                                onOpenExerciseDetail(targetDetailId)
                             }
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = AccentYellow, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Exercício Partilhado",
+                                text = if (isCustomExercise) "Exercício Personalizado" else "Exercício Partilhado",
                                 style = AppTypography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = AccentYellow
                             )
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = exerciseName,
+                            text = displayName,
                             style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
+                            color = if (isMe) Color.White else TextWhite
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = message.sharedPostContent.orEmpty(),
+                            text = displayDescription,
                             style = AppTypography.bodyMedium,
                             color = OutlineBorder
                         )
@@ -995,7 +1096,7 @@ fun MessageRow(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Button(
-                            onClick = { onOpenExerciseDetail(exerciseName) },
+                            onClick = { onOpenExerciseDetail(targetDetailId) },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = AccentYellow,
                                 contentColor = Color.Black
@@ -1011,6 +1112,7 @@ fun MessageRow(
                                 style = AppTypography.labelSmall.copy(fontWeight = FontWeight.Bold)
                             )
                         }
+
                     }
                 } else {
                     // Shared Post Bubble
@@ -1036,14 +1138,14 @@ fun MessageRow(
                     Text(
                         text = "Treino de ${message.sharedPostAuthorName.orEmpty()}",
                         style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
+                        color = if (isMe) Color.White else TextWhite
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     if (!message.sharedPostContent.isNullOrBlank()) {
                         Text(
                             text = message.sharedPostContent,
                             style = AppTypography.bodyMedium,
-                            color = Color.White,
+                            color = if (isMe) Color.White else TextWhite,
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1123,4 +1225,43 @@ fun MessageRow(
             )
         }
     }
+}
+
+private fun deserializeExercise(serialized: String): com.train.app.data.models.ExerciseLibraryItem? {
+    if (!serialized.startsWith("EX_SERIALIZED|")) return null
+    val parts = serialized.substringAfter("EX_SERIALIZED|").split("|")
+    val map = mutableMapOf<String, String>()
+    for (part in parts) {
+        val colonIdx = part.indexOf(":")
+        if (colonIdx != -1) {
+            val key = part.substring(0, colonIdx)
+            val value = part.substring(colonIdx + 1)
+            map[key] = value
+        }
+    }
+    val id = map["id"].orEmpty()
+    val name = map["name"].orEmpty()
+    val primary = map["primary"].orEmpty()
+    val secondary = map["secondary"]?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+    val equipment = map["equipment"].orEmpty()
+    val category = map["category"].orEmpty()
+    val forceStr = map["force"] ?: "PUSH"
+    val force = try { com.train.app.data.models.ExerciseForce.valueOf(forceStr) } catch(e: Exception) { com.train.app.data.models.ExerciseForce.PUSH }
+    val diffStr = map["difficulty"] ?: "BEGINNER"
+    val diff = try { com.train.app.data.models.ExerciseDifficulty.valueOf(diffStr) } catch(e: Exception) { com.train.app.data.models.ExerciseDifficulty.BEGINNER }
+    val instructions = map["instructions"]?.split(";;")?.filter { it.isNotBlank() } ?: emptyList()
+    val tips = map["tips"]?.split(";;")?.filter { it.isNotBlank() } ?: emptyList()
+    return com.train.app.data.models.ExerciseLibraryItem(
+        id = id,
+        name = name,
+        primaryMuscle = primary,
+        secondaryMuscles = secondary,
+        equipment = equipment,
+        category = category,
+        force = force,
+        difficulty = diff,
+        instructions = instructions,
+        tips = tips,
+        isCustom = true
+    )
 }

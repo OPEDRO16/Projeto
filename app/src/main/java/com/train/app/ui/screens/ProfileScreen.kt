@@ -2,6 +2,8 @@ package com.train.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,13 +25,16 @@ import com.train.app.data.FirebaseManager
 import com.train.app.data.models.UserProfile
 import com.train.app.data.models.WorkoutSession
 import com.train.app.ui.components.UserAvatar
+import androidx.compose.ui.graphics.Brush
 import com.train.app.ui.theme.AccentBlue
 import com.train.app.ui.theme.AccentYellow
+import com.train.app.ui.theme.AccentPurple
 import com.train.app.ui.theme.AppTypography
 import com.train.app.ui.theme.BackgroundDark
 import com.train.app.ui.theme.OutlineBorder
 import com.train.app.ui.theme.SurfaceLevel1
 import com.train.app.ui.theme.TextPrimary
+import com.train.app.ui.theme.TextWhite
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -41,7 +46,8 @@ fun ProfileScreen(
     onOpenWorkoutDetail: (String) -> Unit = {},
     onOpenEditProfile: () -> Unit = {},
     onOpenFriends: () -> Unit = {},
-    onOpenExerciseLibrary: () -> Unit = {}
+    onOpenExerciseLibrary: () -> Unit = {},
+    onOpenSubscriptionPaywall: () -> Unit = {}
 ) {
     val currentUser = FirebaseManager.auth.currentUser
     var sessions by remember { mutableStateOf<List<WorkoutSession>>(emptyList()) }
@@ -61,7 +67,7 @@ fun ProfileScreen(
             .document(currentUser.uid)
             .get()
             .addOnSuccessListener { doc ->
-                userProfile = doc.toObject(UserProfile::class.java)
+                userProfile = doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
                 
                 FirebaseManager.firestore
                     .collection("users")
@@ -119,26 +125,26 @@ fun ProfileScreen(
                                 if (requestsCount > 0) {
                                     Badge(
                                         containerColor = Color.Red,
-                                        contentColor = Color.White
+                                        contentColor = TextWhite
                                     ) {
                                         Text("$requestsCount")
                                     }
                                 }
                             }
                         ) {
-                            Icon(Icons.Default.People, contentDescription = "Amigos e Pedidos", tint = Color.White)
+                            Icon(Icons.Default.People, contentDescription = "Amigos e Pedidos", tint = TextWhite)
                         }
                     }
                     IconButton(onClick = onOpenEditProfile) {
-                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = Color.White)
+                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = TextWhite)
                     }
                     IconButton(onClick = { FirebaseManager.auth.signOut() }) {
-                        Icon(Icons.Default.ExitToApp, contentDescription = "Encerrar Sessão", tint = Color.White)
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Encerrar Sessão", tint = TextWhite)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = BackgroundDark,
-                    titleContentColor = Color.White
+                    titleContentColor = TextWhite
                 )
             )
         }
@@ -164,7 +170,52 @@ fun ProfileScreen(
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(username, style = AppTypography.headlineLarge.copy(fontSize = 20.sp), color = Color.White)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(username, style = AppTypography.headlineLarge.copy(fontSize = 20.sp), color = TextWhite)
+                            
+                            val tier = userProfile?.subscriptionTier ?: "FREE"
+                            if (tier == "PRO") {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                colors = listOf(Color(0xFFFFD700), Color(0xFFFFA500))
+                                            )
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "★ PRO",
+                                        color = Color.Black,
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            } else if (tier == "MASTER") {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                colors = listOf(Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF3B82F6))
+                                            )
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "👑 MASTER",
+                                        color = TextWhite,
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -172,6 +223,65 @@ fun ProfileScreen(
                         ) {
                             ProfileStatItem("Treinamentos", totalWorkouts.toString())
                             ProfileStatItem("Amigos", seguindoCount.toString(), onClick = onOpenFriends)
+                        }
+                    }
+                }
+            }
+
+            // Seja Premium Card (Upsell Card)
+            val currentTier = userProfile?.subscriptionTier ?: "FREE"
+            if (currentTier != "MASTER") {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .clickable { onOpenSubscriptionPaywall() },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceLevel1),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(AccentYellow, AccentPurple)
+                            )
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "SEJA PREMIUM 👑",
+                                    color = AccentYellow,
+                                    style = AppTypography.headlineLarge.copy(fontSize = 16.sp, fontWeight = FontWeight.Black)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (currentTier == "FREE") 
+                                        "Desbloqueia IA ilimitada, até 8 rotinas, remove anúncios e ganha um badge PRO dourado!"
+                                        else "Faz upgrade para MASTER! IA e rotinas 100% ilimitadas com zero anúncios!",
+                                    color = TextWhite.copy(alpha = 0.8f),
+                                    style = AppTypography.bodySmall
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(AccentYellow)
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = "VER PLANOS",
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    style = AppTypography.labelSmall
+                                )
+                            }
                         }
                     }
                 }
@@ -256,7 +366,7 @@ private fun ProfileStatItem(label: String, value: String, onClick: () -> Unit = 
         Text(
             text = value,
             style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-            color = Color.White
+            color = TextWhite
         )
     }
 }
@@ -273,9 +383,9 @@ private fun PanelCard(icon: androidx.compose.ui.graphics.vector.ImageVector, tit
         contentAlignment = Alignment.CenterStart
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = Color.White)
+            Icon(icon, contentDescription = null, tint = TextWhite)
             Spacer(modifier = Modifier.width(12.dp))
-            Text(title, style = AppTypography.bodyLarge, color = Color.White)
+            Text(title, style = AppTypography.bodyLarge, color = TextWhite)
         }
     }
 }
@@ -310,7 +420,7 @@ private fun HevyWorkoutHistoryCard(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
-                    Text(text = username, style = AppTypography.bodyLarge, color = Color.White)
+                    Text(text = username, style = AppTypography.bodyLarge, color = TextWhite)
                     Text(text = date, style = AppTypography.labelSmall, color = OutlineBorder)
                 }
             }
@@ -322,7 +432,7 @@ private fun HevyWorkoutHistoryCard(
         Text(
             text = session.routineName.ifBlank { "Treino" },
             style = AppTypography.headlineLarge.copy(fontSize = 18.sp),
-            color = Color.White
+            color = TextWhite
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -335,17 +445,17 @@ private fun HevyWorkoutHistoryCard(
             Column {
                 Text("Tempo", style = AppTypography.labelSmall, color = OutlineBorder)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("${session.durationMinutes}m", style = AppTypography.bodyLarge, color = Color.White)
+                Text("${session.durationMinutes}m", style = AppTypography.bodyLarge, color = TextWhite)
             }
             Column {
                 Text("Volume", style = AppTypography.labelSmall, color = OutlineBorder)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("${session.totalVolume.toInt()} kg", style = AppTypography.bodyLarge, color = Color.White)
+                Text("${session.totalVolume.toInt()} kg", style = AppTypography.bodyLarge, color = TextWhite)
             }
             Column {
                 Text("Recordes", style = AppTypography.labelSmall, color = OutlineBorder)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("0", style = AppTypography.bodyLarge, color = Color.White) // Mock PRs for now
+                Text("0", style = AppTypography.bodyLarge, color = TextWhite) // Mock PRs for now
             }
         }
         

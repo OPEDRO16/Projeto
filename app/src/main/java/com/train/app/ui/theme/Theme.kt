@@ -36,8 +36,37 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun TrainTheme(content: @Composable () -> Unit) {
+    val dynamicColorScheme = darkColorScheme(
+        primary                = AccentBlue,
+        onPrimary              = Color.White,
+        primaryContainer       = if (currentThemeName == "LIGHT") Color(0xFFEAEAEA) else PrimaryContainer,
+        onPrimaryContainer     = if (currentThemeName == "LIGHT") TextPrimary else Color(0xFF848081),
+        secondary              = Color(0xFFC2C7CB),
+        onSecondary            = Color(0xFF2C3134),
+        secondaryContainer     = Color(0xFF42484B),
+        onSecondaryContainer   = Color(0xFFB0B6BA),
+        background             = BackgroundDark,
+        onBackground           = TextPrimary,
+        surface                = BackgroundDark,
+        onSurface              = TextPrimary,
+        surfaceVariant         = SurfaceLevel1,
+        onSurfaceVariant       = TextPrimary,
+        surfaceContainer       = BackgroundDark, // NavigationBar background
+        surfaceContainerHigh   = SurfaceLevel1,
+        surfaceContainerHighest= SurfaceLevel1,
+        outline                = OutlineBorder,
+        outlineVariant         = OutlineBorder,
+        error                  = Color(0xFFFFB4AB),
+        onError                = Color(0xFF690005),
+        errorContainer         = Color(0xFF93000A),
+        onErrorContainer       = Color(0xFFFFDAD6),
+        inverseSurface         = TextPrimary,
+        inverseOnSurface       = BackgroundDark,
+        inversePrimary         = Color(0xFF615D5E),
+    )
+
     MaterialTheme(
-        colorScheme = DarkColorScheme,
+        colorScheme = dynamicColorScheme,
         typography  = AppTypography,
         shapes      = AppShapes,
         content     = content

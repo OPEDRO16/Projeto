@@ -50,6 +50,7 @@ import com.train.app.data.FirebaseManager
 import com.train.app.data.models.WorkoutSession
 import com.train.app.data.models.ChatRoom
 import com.train.app.data.models.UserProfile
+import com.train.app.data.models.ExerciseLibraryItem
 import com.train.app.data.models.Message
 import java.util.UUID
 import android.widget.Toast
@@ -97,7 +98,7 @@ fun ExerciseDetailScreen(
             FirebaseManager.firestore.collection("users").document(myUid)
                 .get()
                 .addOnSuccessListener { doc ->
-                    currentUserProfile = doc.toObject(UserProfile::class.java)
+                    currentUserProfile = doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
                 }
 
             FirebaseManager.firestore.collection("chatRooms")
@@ -115,21 +116,105 @@ fun ExerciseDetailScreen(
     val decodedExerciseName = remember(exerciseName) {
         URLDecoder.decode(exerciseName, StandardCharsets.UTF_8.toString())
     }
-    val userId = FirebaseManager.auth.currentUser?.uid
 
-    // Fetch matching library exercise to show target muscles and instructions
-    val libraryItem = remember(decodedExerciseName) {
-        ExerciseLibraryRepository.exercises.firstOrNull {
-            it.name.equals(decodedExerciseName, ignoreCase = true) ||
-            it.id.equals(decodedExerciseName.replace(" ", "_").lowercase(), ignoreCase = true)
+    val isCustomFormat = remember(decodedExerciseName) {
+        decodedExerciseName.startsWith("custom_") || decodedExerciseName.startsWith("EX_SERIALIZED|")
+    }
+
+    val actualExerciseId = remember(decodedExerciseName) {
+        if (isCustomFormat && decodedExerciseName.contains("_by_")) {
+            val fullId = decodedExerciseName.split("_by_").getOrNull(0).orEmpty()
+            if (fullId.startsWith("EX_SERIALIZED|")) {
+                val deserialized = deserializeExercise(fullId)
+                deserialized?.id ?: "custom_exercise"
+            } else {
+                fullId
+            }
+        } else {
+            decodedExerciseName
         }
     }
 
-    LaunchedEffect(userId) {
+    val senderId = remember(decodedExerciseName) {
+        if (isCustomFormat && decodedExerciseName.contains("_by_")) {
+            decodedExerciseName.split("_by_").getOrNull(1).orEmpty()
+        } else {
+            FirebaseManager.auth.currentUser?.uid.orEmpty()
+        }
+    }
+
+    val deserializedFromRoute = remember(decodedExerciseName) {
+        if (decodedExerciseName.startsWith("EX_SERIALIZED|")) {
+            val fullId = decodedExerciseName.split("_by_").getOrNull(0).orEmpty()
+            deserializeExercise(fullId)
+        } else null
+    }
+
+    val userId = FirebaseManager.auth.currentUser?.uid
+    var customExercises by remember { mutableStateOf<List<ExerciseLibraryItem>>(emptyList()) }
+
+    // Fetch matching library exercise to show target muscles and instructions
+    val libraryItem = remember(actualExerciseId, customExercises, deserializedFromRoute) {
+        deserializedFromRoute ?: run {
+            val staticItem = ExerciseLibraryRepository.exercises.firstOrNull {
+                it.name.equals(actualExerciseId, ignoreCase = true) ||
+                it.id.equals(actualExerciseId.replace(" ", "_").lowercase(), ignoreCase = true)
+            }
+            staticItem ?: customExercises.firstOrNull {
+                it.id == actualExerciseId ||
+                it.name.equals(actualExerciseId, ignoreCase = true) ||
+                it.id.equals(actualExerciseId.replace(" ", "_").lowercase(), ignoreCase = true)
+            }
+        }
+    }
+
+    val displayName = remember(decodedExerciseName, libraryItem) {
+        if (isCustomFormat && libraryItem == null) {
+            "A carregar..."
+        } else {
+            libraryItem?.name ?: decodedExerciseName
+        }
+    }
+
+    LaunchedEffect(userId, actualExerciseId, senderId, deserializedFromRoute) {
         if (userId == null) {
             isLoading = false
             errorMessage = "Utilizador não autenticado"
             return@LaunchedEffect
+        }
+
+        if (deserializedFromRoute != null) {
+            isLoading = false
+        } else if (isCustomFormat && senderId.isNotEmpty() && senderId != userId) {
+            FirebaseManager.firestore
+                .collection("users")
+                .document(senderId)
+                .collection("custom_exercises")
+                .document(actualExerciseId)
+                .get()
+                .addOnSuccessListener { doc ->
+                    if (doc != null && doc.exists()) {
+                        val item = doc.toObject(ExerciseLibraryItem::class.java)
+                        if (item != null) {
+                            customExercises = listOf(item)
+                        }
+                    }
+                    isLoading = false
+                }
+                .addOnFailureListener {
+                    isLoading = false
+                }
+        } else {
+            FirebaseManager.firestore
+                .collection("users")
+                .document(userId)
+                .collection("custom_exercises")
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    if (snapshot != null) {
+                        customExercises = snapshot.toObjects(ExerciseLibraryItem::class.java)
+                    }
+                }
         }
 
         FirebaseManager.firestore
@@ -148,8 +233,9 @@ fun ExerciseDetailScreen(
             }
     }
 
-    val history = remember(sessions, decodedExerciseName) {
-        buildExerciseHistory(sessions, decodedExerciseName)
+    val resolvedExerciseNameForHistory = libraryItem?.name ?: decodedExerciseName
+    val history = remember(sessions, resolvedExerciseNameForHistory) {
+        buildExerciseHistory(sessions, resolvedExerciseNameForHistory)
     }
     val topEntry = history.maxByOrNull { it.heaviestWeight }
     val bestOneRm = history.maxOfOrNull { it.estimatedOneRepMax } ?: 0f
@@ -180,22 +266,20 @@ fun ExerciseDetailScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = Color.White)
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = TextWhite)
                     }
                     Text(
-                        text = decodedExerciseName,
+                        text = displayName,
                         modifier = Modifier.weight(1f),
                         style = AppTypography.headlineLarge.copy(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.SansSerif
                         ),
-                        color = Color.White,
+                        color = TextWhite,
                         textAlign = TextAlign.Center
                     )
-                    IconButton(onClick = { showShareSheet = true }) {
-                        Icon(Icons.Default.Share, contentDescription = "Partilhar", tint = Color.White)
-                    }
+                    Spacer(modifier = Modifier.width(48.dp))
                 }
 
                 // Tab Bar ("Resumo", "Histórico", "Instruções")
@@ -222,7 +306,7 @@ fun ExerciseDetailScreen(
                         )
                     },
                     divider = {
-                        HorizontalDivider(color = Color(0xFF2E2D2D))
+                        HorizontalDivider(color = DividerColor)
                     }
                 ) {
                     Tab(
@@ -374,13 +458,13 @@ fun ExerciseDetailScreen(
                                                     fontSize = 20.sp,
                                                     fontWeight = FontWeight.Bold
                                                 ),
-                                                color = Color.White
+                                                color = TextWhite
                                             )
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Text(
                                                 text = "Secundários: ${libraryItem?.secondaryMuscles?.joinToString(", ") ?: "Nenhum"}",
                                                 style = AppTypography.bodySmall,
-                                                color = OutlineBorder
+                                                color = Outline
                                             )
                                         }
 
@@ -434,9 +518,9 @@ fun ExerciseDetailScreen(
                         item {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(
-                                    text = decodedExerciseName.lowercase(),
+                                    text = displayName.lowercase(),
                                     style = AppTypography.headlineLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold),
-                                    color = Color.White
+                                    color = TextWhite
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
@@ -462,13 +546,13 @@ fun ExerciseDetailScreen(
                                             Text(
                                                 text = "${formatWeight(latestEntry.heaviestWeight)} kg • ${latestEntry.bestReps} reps",
                                                 style = AppTypography.headlineLarge.copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
-                                                color = Color.White
+                                                color = TextWhite
                                             )
                                         } else {
                                             Text(
                                                 text = "Sem Carga Recente",
                                                 style = AppTypography.headlineLarge.copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
-                                                color = Color.White
+                                                color = TextWhite
                                             )
                                         }
 
@@ -550,7 +634,7 @@ fun ExerciseDetailScreen(
                                     Text(
                                         text = "Recordes Pessoais",
                                         style = AppTypography.headlineLarge.copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
-                                        color = Color.White
+                                        color = TextWhite
                                     )
                                 }
                             }
@@ -570,7 +654,7 @@ fun ExerciseDetailScreen(
                                             color = AccentBlue
                                         )
                                     }
-                                    HorizontalDivider(color = Color(0xFF2B2A2A))
+                                    HorizontalDivider(color = DividerColor)
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
@@ -582,7 +666,7 @@ fun ExerciseDetailScreen(
                                             color = AccentBlue
                                         )
                                     }
-                                    HorizontalDivider(color = Color(0xFF2B2A2A))
+                                    HorizontalDivider(color = DividerColor)
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
@@ -696,7 +780,7 @@ fun ExerciseDetailScreen(
                                                 Text(
                                                     text = step,
                                                     style = AppTypography.bodyMedium,
-                                                    color = Color.White,
+                                                    color = TextWhite,
                                                     modifier = Modifier.weight(1f)
                                                 )
                                             }
@@ -743,91 +827,7 @@ fun ExerciseDetailScreen(
         }
     }
 
-    if (showShareSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showShareSheet = false },
-            containerColor = SurfaceLevel1,
-            dragHandle = { BottomSheetDefaults.DragHandle(color = OutlineBorder) }
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 32.dp)
-            ) {
-                Text(
-                    text = "Partilhar Exercício",
-                    style = AppTypography.headlineLarge.copy(fontSize = 20.sp),
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Escolhe uma conversa para enviar este exercício:",
-                    style = AppTypography.bodyMedium,
-                    color = OutlineBorder
-                )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (chatRooms.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Não tens conversas ou grupos ativos.", color = OutlineBorder)
-                    }
-                } else {
-                    val context = LocalContext.current
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.heightIn(max = 300.dp)
-                    ) {
-                        items(chatRooms.size) { index ->
-                            val room = chatRooms[index]
-                            ShareChatItem(
-                                room = room,
-                                currentUserId = currentUser?.uid.orEmpty(),
-                                onShare = {
-                                    val myUid = currentUser?.uid.orEmpty()
-                                    val myName = currentUserProfile?.name ?: "Parceiro"
-
-                                    val db = FirebaseManager.firestore
-                                    val newMsg = Message(
-                                        id = UUID.randomUUID().toString(),
-                                        senderId = myUid,
-                                        senderName = myName,
-                                        text = "Partilhou o exercício: ${decodedExerciseName}",
-                                        timestamp = System.currentTimeMillis(),
-                                        sharedPostId = "EXERCISE:${decodedExerciseName}",
-                                        sharedPostContent = "Vê a anatomia, músculos ativados e execução deste exercício.",
-                                        sharedPostAuthorName = decodedExerciseName,
-                                        sharedPostImageUrl = null,
-                                        sharedWorkoutSessionId = null,
-                                        sharedPostUserId = null
-                                    )
-
-                                    db.collection("chatRooms").document(room.id)
-                                        .collection("messages").document(newMsg.id).set(newMsg)
-                                        .addOnSuccessListener {
-                                            db.collection("chatRooms").document(room.id).update(
-                                                "lastMessageContent", "Partilhou o exercício: ${decodedExerciseName}",
-                                                "lastMessageSender", myName,
-                                                "lastMessageTime", System.currentTimeMillis()
-                                            )
-                                            Toast.makeText(context, "Exercício partilhado!", Toast.LENGTH_SHORT).show()
-                                            showShareSheet = false
-                                        }
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable
@@ -864,7 +864,7 @@ private fun HistoryBarRow(entry: ExerciseHistoryEntry, maxWeight: Float) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(formatSessionDate(entry.date), style = AppTypography.labelSmall, color = Color.White)
+            Text(formatSessionDate(entry.date), style = AppTypography.labelSmall, color = TextWhite)
             Text(
                 text = "${formatWeight(entry.heaviestWeight)} kg • ${entry.bestReps} reps",
                 style = AppTypography.labelSmall,
@@ -904,7 +904,7 @@ private fun ExerciseHistoryCard(
                     Text(
                         text = entry.routineName.ifBlank { "Treino" },
                         style = AppTypography.headlineLarge.copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
-                        color = Color.White
+                        color = TextWhite
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -927,7 +927,7 @@ private fun ExerciseHistoryCard(
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = Color(0xFF2B2A2A))
+            HorizontalDivider(color = DividerColor)
             Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = "Heaviest: ${formatWeight(entry.heaviestWeight)} kg • 1RM est.: ${formatWeight(entry.estimatedOneRepMax)} kg",
@@ -1110,4 +1110,60 @@ private fun formatSessionDate(timestamp: Long): String {
 
 private fun formatWeight(weight: Float): String {
     return if (weight % 1f == 0f) weight.roundToInt().toString() else String.format(Locale.US, "%.1f", weight)
+}
+
+private fun serializeExercise(item: com.train.app.data.models.ExerciseLibraryItem): String {
+    val sec = item.secondaryMuscles.joinToString(",")
+    val inst = item.instructions.joinToString(";;")
+    val tips = item.tips.joinToString(";;")
+    return "EX_SERIALIZED|" +
+            "id:${item.id}|" +
+            "name:${item.name}|" +
+            "primary:${item.primaryMuscle}|" +
+            "secondary:$sec|" +
+            "equipment:${item.equipment}|" +
+            "category:${item.category}|" +
+            "force:${item.force.name}|" +
+            "difficulty:${item.difficulty.name}|" +
+            "instructions:$inst|" +
+            "tips:$tips"
+}
+
+private fun deserializeExercise(serialized: String): com.train.app.data.models.ExerciseLibraryItem? {
+    if (!serialized.startsWith("EX_SERIALIZED|")) return null
+    val parts = serialized.substringAfter("EX_SERIALIZED|").split("|")
+    val map = mutableMapOf<String, String>()
+    for (part in parts) {
+        val colonIdx = part.indexOf(":")
+        if (colonIdx != -1) {
+            val key = part.substring(0, colonIdx)
+            val value = part.substring(colonIdx + 1)
+            map[key] = value
+        }
+    }
+    val id = map["id"].orEmpty()
+    val name = map["name"].orEmpty()
+    val primary = map["primary"].orEmpty()
+    val secondary = map["secondary"]?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+    val equipment = map["equipment"].orEmpty()
+    val category = map["category"].orEmpty()
+    val forceStr = map["force"] ?: "PUSH"
+    val force = try { com.train.app.data.models.ExerciseForce.valueOf(forceStr) } catch(e: Exception) { com.train.app.data.models.ExerciseForce.PUSH }
+    val diffStr = map["difficulty"] ?: "BEGINNER"
+    val diff = try { com.train.app.data.models.ExerciseDifficulty.valueOf(diffStr) } catch(e: Exception) { com.train.app.data.models.ExerciseDifficulty.BEGINNER }
+    val instructions = map["instructions"]?.split(";;")?.filter { it.isNotBlank() } ?: emptyList()
+    val tips = map["tips"]?.split(";;")?.filter { it.isNotBlank() } ?: emptyList()
+    return com.train.app.data.models.ExerciseLibraryItem(
+        id = id,
+        name = name,
+        primaryMuscle = primary,
+        secondaryMuscles = secondary,
+        equipment = equipment,
+        category = category,
+        force = force,
+        difficulty = diff,
+        instructions = instructions,
+        tips = tips,
+        isCustom = true
+    )
 }

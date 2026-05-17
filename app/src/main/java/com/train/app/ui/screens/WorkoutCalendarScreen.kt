@@ -49,6 +49,7 @@ import com.train.app.ui.theme.BackgroundDark
 import com.train.app.ui.theme.OutlineBorder
 import com.train.app.ui.theme.SurfaceLevel0
 import com.train.app.ui.theme.SurfaceLevel1
+import com.train.app.ui.theme.TextPrimary
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -111,14 +112,14 @@ fun WorkoutCalendarScreen(
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Voltar",
-                        tint = Color.White
+                        tint = TextPrimary
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Calendário",
                     style = AppTypography.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp),
-                    color = Color.White
+                    color = TextPrimary
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -166,7 +167,7 @@ fun WorkoutCalendarScreen(
                                     if (it.isLowerCase()) it.titlecase(Locale("pt", "PT")) else it.toString()
                                 },
                                 style = AppTypography.headlineLarge.copy(fontSize = 20.sp),
-                                color = Color.White
+                                color = TextPrimary
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             MonthCalendarGrid(
@@ -255,7 +256,7 @@ private fun MonthCalendarGrid(
                                     !day.isCurrentMonth -> OutlineBorder.copy(alpha = 0.35f)
                                     isSelected -> Color.White
                                     isWorkoutDay -> AccentBlue
-                                    else -> Color.White
+                                    else -> TextPrimary
                                 },
                                 style = AppTypography.labelMedium.copy(fontFamily = FontFamily.Monospace)
                             )
@@ -296,7 +297,7 @@ private fun CalendarWorkoutCard(
                     Text(
                         text = session.routineName.ifBlank { "Treino" },
                         style = AppTypography.headlineLarge.copy(fontSize = 18.sp),
-                        color = Color.White
+                        color = TextPrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(time, style = AppTypography.labelSmall, color = OutlineBorder)
@@ -332,7 +333,7 @@ private fun CalendarMetric(label: String, value: String) {
         Text(
             text = value,
             style = AppTypography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
-            color = Color.White
+            color = TextPrimary
         )
     }
 }

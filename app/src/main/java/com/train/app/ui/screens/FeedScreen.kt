@@ -2,6 +2,8 @@ package com.train.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -49,10 +51,12 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import com.train.app.data.models.ChatRoom
 import com.train.app.data.models.Message
@@ -112,7 +116,7 @@ fun FeedScreen(
             FirebaseManager.firestore.collection("users").document(currentUser.uid)
                 .addSnapshotListener { snapshot, _ ->
                     if (snapshot != null && snapshot.exists()) {
-                        currentUserProfile = snapshot.toObject(UserProfile::class.java)
+                        currentUserProfile = snapshot.toObject(UserProfile::class.java)?.apply { id = snapshot.id }
                     }
                 }
         }
@@ -143,10 +147,11 @@ fun FeedScreen(
                         ) {
                             Text(
                                 text = if (selectedFilter == "publico") "Público" else "Amigos",
-                                style = AppTypography.headlineLarge.copy(fontSize = 24.sp)
+                                style = AppTypography.headlineLarge.copy(fontSize = 24.sp),
+                                color = TextPrimary
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color.White)
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = TextPrimary)
                         }
 
                         DropdownMenu(
@@ -155,14 +160,14 @@ fun FeedScreen(
                             modifier = Modifier.background(SurfaceLevel1)
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Público", color = if (selectedFilter == "publico") AccentBlue else Color.White, style = AppTypography.bodyLarge) },
+                                text = { Text("Público", color = if (selectedFilter == "publico") AccentBlue else TextPrimary, style = AppTypography.bodyLarge) },
                                 onClick = {
                                     selectedFilter = "publico"
                                     showFilterDropdown = false
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Amigos", color = if (selectedFilter == "seguindo") AccentBlue else Color.White, style = AppTypography.bodyLarge) },
+                                text = { Text("Amigos", color = if (selectedFilter == "seguindo") AccentBlue else TextPrimary, style = AppTypography.bodyLarge) },
                                 onClick = {
                                     selectedFilter = "seguindo"
                                     showFilterDropdown = false
@@ -174,7 +179,7 @@ fun FeedScreen(
                 actions = {},
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = BackgroundDark,
-                    titleContentColor = Color.White
+                    titleContentColor = TextPrimary
                 )
             )
         }
@@ -185,6 +190,7 @@ fun FeedScreen(
                 .background(BackgroundDark)
                 .padding(paddingValues)
         ) {
+            val userTier = currentUserProfile?.subscriptionTier ?: "FREE"
             items(filteredPosts.size) { index ->
                 val post = filteredPosts[index]
 
@@ -196,6 +202,11 @@ fun FeedScreen(
                     onOpenDetail = onOpenWorkoutDetail,
                     onSharePost = { postToShare = it }
                 )
+
+                // Inject sponsored cards periodically for FREE and PRO tiers (every 3 posts)
+                if (userTier != "MASTER" && (index + 1) % 3 == 0) {
+                    HevySponsoredAdCard(index = index)
+                }
             }
         }
     }
@@ -305,7 +316,7 @@ fun HevyPostItem(
             .get()
             .addOnSuccessListener { doc ->
                 if (doc.exists()) {
-                    posterProfile = doc.toObject(UserProfile::class.java)
+                    posterProfile = doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
                 }
             }
     }
@@ -370,7 +381,52 @@ fun HevyPostItem(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
-                    Text(text = post.userName, style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = posterProfile?.name ?: post.userName, style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
+                        
+                        val tier = posterProfile?.subscriptionTier ?: "FREE"
+                        if (tier == "PRO") {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(Color(0xFFFFD700), Color(0xFFFFA500))
+                                        )
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "★ PRO",
+                                    color = Color.Black,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                        } else if (tier == "MASTER") {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF3B82F6))
+                                        )
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "👑 MASTER",
+                                    color = Color.White,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                        }
+                    }
                     Text(text = timeAgo, style = AppTypography.labelSmall, color = OutlineBorder)
                 }
             }
@@ -407,18 +463,27 @@ fun HevyPostItem(
                         )
                     }
                     else -> {
-                        Text(
-                            text = "+ Amigo", 
-                            style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold), 
-                            color = AccentBlue,
-                            modifier = Modifier.clickable {
-                                if (currentUserId != null) {
-                                    localSentRequests.add(post.userId)
-                                    FirebaseManager.firestore.collection("users").document(post.userId)
-                                        .update("friendRequests", FieldValue.arrayUnion(currentUserId))
-                                }
-                            }
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(AccentBlue.copy(alpha = 0.15f))
+                                .clickable {
+                                    if (currentUserId != null) {
+                                        localSentRequests.add(post.userId)
+                                        FirebaseManager.firestore.collection("users").document(post.userId)
+                                            .update("friendRequests", FieldValue.arrayUnion(currentUserId))
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Adicionar Amigo",
+                                tint = AccentBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -438,7 +503,7 @@ fun HevyPostItem(
             Text(
                 text = post.workoutName ?: "Treinamento",
                 style = AppTypography.headlineLarge.copy(fontSize = 18.sp),
-                color = Color.White
+                color = TextPrimary
             )
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -448,12 +513,12 @@ fun HevyPostItem(
                 Column {
                     Text("Tempo", style = AppTypography.labelSmall, color = OutlineBorder)
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("${post.workoutDuration ?: 0}min", style = AppTypography.bodyLarge, color = Color.White)
+                    Text("${post.workoutDuration ?: 0}min", style = AppTypography.bodyLarge, color = TextPrimary)
                 }
                 Column {
                     Text("Volume", style = AppTypography.labelSmall, color = OutlineBorder)
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("${post.workoutVolume?.toInt() ?: 0} kg", style = AppTypography.bodyLarge, color = Color.White)
+                    Text("${post.workoutVolume?.toInt() ?: 0} kg", style = AppTypography.bodyLarge, color = TextPrimary)
                 }
             }
         }
@@ -517,7 +582,7 @@ fun HevyPostItem(
                         Text(
                             text = "Treino Registado com Sucesso!",
                             style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
+                            color = TextPrimary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
@@ -550,22 +615,22 @@ fun HevyPostItem(
                 Icon(
                     imageVector = Icons.Outlined.FavoriteBorder, 
                     contentDescription = "Like", 
-                    tint = if (isLiked) AccentYellow else Color.White
+                    tint = if (isLiked) AccentYellow else TextPrimary
                 )
             }
-            Text(text = "${post.likedBy.size}", style = AppTypography.bodyMedium, color = Color.White)
+            Text(text = "${post.likedBy.size}", style = AppTypography.bodyMedium, color = TextPrimary)
             
             Spacer(modifier = Modifier.width(16.dp))
             
             IconButton(onClick = { onOpenComments(post.id) }) {
-                Icon(Icons.Default.ChatBubbleOutline, contentDescription = "Comment", tint = Color.White)
+                Icon(Icons.Default.ChatBubbleOutline, contentDescription = "Comment", tint = TextPrimary)
             }
-            Text(text = "$commentsCountState", style = AppTypography.bodyMedium, color = Color.White)
+            Text(text = "$commentsCountState", style = AppTypography.bodyMedium, color = TextPrimary)
             
             Spacer(modifier = Modifier.width(16.dp))
-
+ 
             IconButton(onClick = { onSharePost(post) }) {
-                Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White)
+                Icon(Icons.Default.Share, contentDescription = "Share", tint = TextPrimary)
             }
         }
 
@@ -581,7 +646,7 @@ fun HevyPostItem(
                     Text(
                         text = likedText,
                         style = AppTypography.bodyMedium,
-                        color = Color.White
+                        color = TextPrimary
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
@@ -590,10 +655,10 @@ fun HevyPostItem(
             if (post.description.isNotBlank()) {
                 Text(
                     text = buildAnnotatedString {
-                        withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) {
-                            append("${post.userName} ")
+                        withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = TextPrimary)) {
+                            append("${posterProfile?.name ?: post.userName} ")
                         }
-                        withStyle(style = SpanStyle(color = Color.White)) {
+                        withStyle(style = SpanStyle(color = TextPrimary)) {
                             append(post.description)
                         }
                     },
@@ -601,6 +666,11 @@ fun HevyPostItem(
                 )
             }
         }
+        Spacer(modifier = Modifier.height(20.dp))
+        HorizontalDivider(
+            thickness = 2.dp,
+            color = OutlineBorder.copy(alpha = 0.35f)
+        )
     }
 }
 
@@ -619,7 +689,7 @@ fun ShareChatItem(
                 .get()
                 .addOnSuccessListener { doc ->
                     if (doc.exists()) {
-                        contactProfile = doc.toObject(UserProfile::class.java)
+                        contactProfile = doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
                     }
                 }
         }
@@ -660,7 +730,7 @@ fun ShareChatItem(
         Text(
             text = displayName,
             style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-            color = Color.White,
+            color = TextPrimary,
             modifier = Modifier.weight(1f)
         )
 
@@ -676,5 +746,98 @@ fun ShareChatItem(
         ) {
             Text("Partilhar", style = AppTypography.labelSmall.copy(fontWeight = FontWeight.Bold))
         }
+    }
+}
+
+@Composable
+private fun HevySponsoredAdCard(index: Int) {
+    val context = LocalContext.current
+    val brands = listOf(
+        Triple("GYMSHARK 🦈", "Prepara o teu treino com 30% desconto na coleção Flex e calções Seamless. Leveza total para os teus treinos de força.", "COMPRAR AGORA"),
+        Triple("NIKE ⚡", "Just Do It. Descobre os novos Metcon 9 concebidos para treinos de alta estabilidade e flexibilidade.", "VER MODELO"),
+        Triple("OPTIMUM NUTRITION 🎖️", "A proteína de soro de leite mais vendida no mundo. Gold Standard Whey para alimentar a tua massa muscular.", "SABER MAIS")
+    )
+    val brand = remember(index) { brands[index % brands.size] }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 24.dp)
+            .padding(horizontal = 16.dp)
+            .background(SurfaceLevel1, RoundedCornerShape(12.dp))
+            .border(1.dp, OutlineBorder, RoundedCornerShape(12.dp))
+            .padding(16.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(AccentBlue.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = AccentBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = brand.first,
+                        style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "Patrocinado",
+                        style = AppTypography.labelSmall,
+                        color = AccentYellow,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Text(
+            text = brand.second,
+            style = AppTypography.bodyLarge,
+            color = TextPrimary,
+            lineHeight = 20.sp
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Button(
+            onClick = {
+                Toast.makeText(context, "A redirecionar para a oferta da ${brand.first.substringBefore(" ")}... 🌐", Toast.LENGTH_LONG).show()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text(
+                text = brand.third,
+                style = AppTypography.labelMedium,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+        HorizontalDivider(
+            thickness = 2.dp,
+            color = OutlineBorder.copy(alpha = 0.35f)
+        )
     }
 }

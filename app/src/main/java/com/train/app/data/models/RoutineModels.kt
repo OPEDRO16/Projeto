@@ -13,7 +13,8 @@ data class Routine(
     var focus: String = "Força",
     var durationMinutes: Int = 0,
     var lastTrained: Long? = null,
-    var exercises: List<Exercise> = emptyList()
+    var exercises: List<Exercise> = emptyList(),
+    var isAiGenerated: Boolean = false
 )
 
 /**

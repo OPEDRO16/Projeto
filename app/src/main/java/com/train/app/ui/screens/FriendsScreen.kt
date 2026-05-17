@@ -57,7 +57,7 @@ fun FriendsScreen(
             FirebaseManager.firestore.collection("users").document(currentUser.uid)
                 .addSnapshotListener { snapshot, _ ->
                     if (snapshot != null && snapshot.exists()) {
-                        userProfile = snapshot.toObject(UserProfile::class.java)
+                        userProfile = snapshot.toObject(UserProfile::class.java)?.apply { id = snapshot.id }
                     }
                 }
         }
@@ -78,7 +78,9 @@ fun FriendsScreen(
                     .whereIn("id", chunk)
                     .get()
                     .addOnSuccessListener { snap ->
-                        friendsTemp.addAll(snap.toObjects(UserProfile::class.java))
+                        friendsTemp.addAll(snap.documents.mapNotNull { doc ->
+                            doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
+                        })
                         friendsList = friendsTemp.toList()
                     }
             }
@@ -95,7 +97,9 @@ fun FriendsScreen(
                     .whereIn("id", chunk)
                     .get()
                     .addOnSuccessListener { snap ->
-                        reqTemp.addAll(snap.toObjects(UserProfile::class.java))
+                        reqTemp.addAll(snap.documents.mapNotNull { doc ->
+                            doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
+                        })
                         requestsList = reqTemp.toList()
                     }
             }
@@ -112,7 +116,9 @@ fun FriendsScreen(
             // Vamos descarregar todos para simplificar a protoype ou apenas usar orderBy
             FirebaseManager.firestore.collection("users").get()
                 .addOnSuccessListener { snap ->
-                    val allUsers = snap.toObjects(UserProfile::class.java)
+                    val allUsers = snap.documents.mapNotNull { doc ->
+                        doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
+                    }
                     val q = searchQuery.lowercase()
                     searchResults = allUsers.filter {
                         it.id != currentUser?.uid && 
@@ -132,12 +138,12 @@ fun FriendsScreen(
                 title = { Text("Amigos", style = AppTypography.headlineLarge.copy(fontSize = 20.sp)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = Color.White)
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = TextWhite)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = BackgroundDark,
-                    titleContentColor = Color.White
+                    titleContentColor = TextWhite
                 )
             )
         }
@@ -231,7 +237,7 @@ fun FriendsScreen(
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = SurfaceLevel1)
                                         ) {
-                                            Text("Recusar", color = Color.White)
+                                            Text("Recusar", color = TextWhite)
                                         }
                                         TrainPrimaryButton(
                                             text = "Aceitar",
@@ -335,7 +341,7 @@ fun UserListItem(
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text(user.name, style = AppTypography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(user.name, style = AppTypography.bodyLarge, fontWeight = FontWeight.Bold, color = TextWhite)
                 Text(user.email, style = AppTypography.labelSmall, color = OutlineBorder)
             }
         }

@@ -25,6 +25,13 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.train.app.data.models.Routine
 import com.train.app.navigation.Screen
+import androidx.compose.runtime.LaunchedEffect
+import com.train.app.data.FirebaseManager
+import com.train.app.data.models.UserProfile
+import com.train.app.ui.components.TrainAdDialog
+import com.train.app.ui.components.TrainSubscriptionDialog
+import com.train.app.ui.theme.*
+
 
 @Composable
 fun MainScreen() {
@@ -33,6 +40,29 @@ fun MainScreen() {
     val currentRoute = currentBackStackEntry?.destination?.route
 
     var activeWorkoutRoutine by remember { mutableStateOf<Routine?>(null) }
+    var userProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var showSubscriptionPaywall by remember { mutableStateOf(false) }
+    var showAdInterstitial by remember { mutableStateOf(false) }
+    var pendingStartRoutine by remember { mutableStateOf<Routine?>(null) }
+
+    val currentUser = remember { FirebaseManager.auth.currentUser }
+
+    LaunchedEffect(currentUser?.uid) {
+        if (currentUser != null) {
+            FirebaseManager.firestore.collection("users").document(currentUser.uid)
+                .addSnapshotListener { snapshot, _ ->
+                    if (snapshot != null && snapshot.exists()) {
+                        val profile = snapshot.toObject(UserProfile::class.java)?.apply { id = snapshot.id }
+                        userProfile = profile
+                        if (profile != null) {
+                            currentThemeName = profile.appTheme
+                            currentCustomAccentColor = profile.customAccentColor
+                        }
+                    }
+                }
+        }
+    }
+
 
     val bottomItems = listOf(
         BottomNavItem("feed", "Início", Icons.Default.Home),
@@ -86,14 +116,23 @@ fun MainScreen() {
             composable("treino") {
                 WorkoutDashboardScreen(
                     onStartWorkout = { routine ->
-                        activeWorkoutRoutine = routine ?: Routine(name = "Treino Livre")
+                        val tier = userProfile?.subscriptionTier ?: "FREE"
+                        if (tier == "FREE") {
+                            pendingStartRoutine = routine ?: Routine(name = "Treino Livre")
+                            showAdInterstitial = true
+                        } else {
+                            activeWorkoutRoutine = routine ?: Routine(name = "Treino Livre")
+                        }
                     },
                     onNavigateToEditor = { navController.navigate("routine_editor") },
                     onNavigateToEditRoutine = { routineId ->
                         navController.navigate("routine_editor/$routineId")
-                    }
+                    },
+                    subscriptionTier = userProfile?.subscriptionTier ?: "FREE",
+                    onOpenSubscriptionPaywall = { showSubscriptionPaywall = true }
                 )
             }
+
 
             composable("chat") {
                 ChatScreen(
@@ -120,9 +159,11 @@ fun MainScreen() {
                     },
                     onOpenExerciseLibrary = {
                         navController.navigate(Screen.ExerciseLibrary.route)
-                    }
+                    },
+                    onOpenSubscriptionPaywall = { showSubscriptionPaywall = true }
                 )
             }
+
 
             composable("routine_editor") {
                 RoutineEditorScreen(
@@ -148,7 +189,9 @@ fun MainScreen() {
                     onOpenExercise = { exerciseId ->
                         navController.navigate(Screen.ExerciseLibraryDetail.createRoute(exerciseId))
                     },
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    subscriptionTier = userProfile?.subscriptionTier ?: "FREE",
+                    onOpenSubscriptionPaywall = { showSubscriptionPaywall = true }
                 )
             }
 
@@ -257,7 +300,10 @@ fun MainScreen() {
             }
 
             composable(route = Screen.EditProfile.route) {
-                EditProfileScreen(onBack = { navController.popBackStack() })
+                EditProfileScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenSubscriptionPaywall = { showSubscriptionPaywall = true }
+                )
             }
 
             composable(route = Screen.Friends.route) {
@@ -324,7 +370,32 @@ fun MainScreen() {
             )
         }
     }
+
+    if (showSubscriptionPaywall) {
+        TrainSubscriptionDialog(
+            onDismiss = { showSubscriptionPaywall = false },
+            onSubscriptionSuccess = { newTier ->
+                // Sincronizado automaticamente via Firestore Snapshot Listener!
+            }
+        )
+    }
+
+    if (showAdInterstitial) {
+        TrainAdDialog(
+            onDismiss = {
+                showAdInterstitial = false
+                if (pendingStartRoutine != null) {
+                    activeWorkoutRoutine = pendingStartRoutine
+                    pendingStartRoutine = null
+                }
+            },
+            onUpgradeClick = {
+                showSubscriptionPaywall = true
+            }
+        )
+    }
 }
+
 
 private data class BottomNavItem(
     val route: String,

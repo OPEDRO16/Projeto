@@ -23,6 +23,9 @@ import androidx.compose.ui.unit.sp
 import com.train.app.data.FirebaseManager
 import com.train.app.data.models.Post
 import com.train.app.data.models.WorkoutSession
+import com.train.app.data.models.UserProfile
+import com.train.app.ui.components.TrainAdDialog
+import com.train.app.ui.components.TrainSubscriptionDialog
 import com.train.app.ui.components.TrainInput
 import com.train.app.ui.components.TrainPrimaryButton
 import com.train.app.ui.components.TrainSecondaryButton
@@ -55,6 +58,22 @@ fun CreatePostScreen(
     var isLoadingSession by remember { mutableStateOf(true) }
 
     val currentUser = FirebaseManager.auth.currentUser
+    var userProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var showAdInterstitial by remember { mutableStateOf(false) }
+    var showSubscriptionPaywall by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentUser?.uid) {
+        if (currentUser != null) {
+            FirebaseManager.firestore.collection("users").document(currentUser.uid)
+                .get()
+                .addOnSuccessListener { doc ->
+                    if (doc.exists()) {
+                        userProfile = doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
+                    }
+                }
+        }
+    }
+
 
     var imageUrl by remember { mutableStateOf("") }
     var bitmapState by remember(imageUrl) { mutableStateOf<Bitmap?>(null) }
@@ -262,7 +281,12 @@ fun CreatePostScreen(
                             FirebaseManager.firestore.collection("posts").document(post.id).set(post)
                                 .addOnSuccessListener {
                                     Toast.makeText(context, "Partilhado no Feed!", Toast.LENGTH_SHORT).show()
-                                    onPostCreated()
+                                    val tier = userProfile?.subscriptionTier ?: "FREE"
+                                    if (tier == "FREE") {
+                                        showAdInterstitial = true
+                                    } else {
+                                        onPostCreated()
+                                    }
                                 }
                                 .addOnFailureListener { e ->
                                     isPosting = false
@@ -274,6 +298,27 @@ fun CreatePostScreen(
                 )
             }
         }
+    }
+
+    if (showSubscriptionPaywall) {
+        TrainSubscriptionDialog(
+            onDismiss = { showSubscriptionPaywall = false },
+            onSubscriptionSuccess = { newTier ->
+                // Sincronizado automaticamente!
+            }
+        )
+    }
+
+    if (showAdInterstitial) {
+        TrainAdDialog(
+            onDismiss = {
+                showAdInterstitial = false
+                onPostCreated()
+            },
+            onUpgradeClick = {
+                showSubscriptionPaywall = true
+            }
+        )
     }
 }
 

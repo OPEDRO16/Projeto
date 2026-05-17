@@ -1,8 +1,6 @@
 package com.train.app.ui.screens
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import com.train.app.data.ExerciseLibraryRepository
+import androidx.compose.runtime.*
 
 @Composable
 fun ExerciseLibraryDetailScreen(
@@ -10,11 +8,8 @@ fun ExerciseLibraryDetailScreen(
     onBack: () -> Unit = {},
     onOpenWorkout: (String) -> Unit = {}
 ) {
-    val exercise = remember(exerciseId) { ExerciseLibraryRepository.getById(exerciseId) }
-    val exerciseName = exercise?.name ?: exerciseId
-
     ExerciseDetailScreen(
-        exerciseName = exerciseName,
+        exerciseName = exerciseId,
         onBack = onBack,
         onOpenWorkout = onOpenWorkout
     )

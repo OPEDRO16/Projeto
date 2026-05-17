@@ -46,6 +46,7 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.train.app.data.ExerciseLibraryRepository
+import com.train.app.data.models.ExerciseLibraryItem
 import com.train.app.data.models.Exercise
 import com.train.app.data.models.Routine
 import com.train.app.data.models.WorkoutSet
@@ -57,6 +58,7 @@ import com.train.app.ui.theme.BackgroundDark
 import com.train.app.ui.theme.OutlineBorder
 import com.train.app.ui.theme.SurfaceLevel0
 import com.train.app.ui.theme.SurfaceLevel1
+import com.train.app.ui.theme.TextWhite
 import java.util.UUID
 
 @Composable
@@ -93,19 +95,39 @@ fun RoutineEditorScreen(
         }
     }
 
-    val allExercises = remember { ExerciseLibraryRepository.exercises }
-    val muscleFilters = remember(allExercises) {
-        listOf("All") + allExercises.map { it.primaryMuscle }.distinct().sorted()
+    val currentUserId = Firebase.auth.currentUser?.uid
+    var customExercises by remember { mutableStateOf<List<ExerciseLibraryItem>>(emptyList()) }
+    LaunchedEffect(currentUserId) {
+        if (currentUserId != null) {
+            Firebase.firestore.collection("users")
+                .document(currentUserId)
+                .collection("custom_exercises")
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    if (snapshot != null) {
+                        customExercises = snapshot.toObjects(ExerciseLibraryItem::class.java)
+                    }
+                }
+        }
     }
 
-    val filteredExercises = remember(query, selectedMuscle) {
-        ExerciseLibraryRepository.filterExercises(
-            query = query,
-            primaryMuscle = selectedMuscle,
-            equipment = "All",
-            difficulty = "All",
-            category = "All"
-        )
+    val baseExercises = remember { ExerciseLibraryRepository.exercises }
+    val combinedExercises = remember(baseExercises, customExercises) {
+        baseExercises + customExercises
+    }
+
+    val muscleFilters = remember(combinedExercises) {
+        listOf("All") + combinedExercises.map { it.primaryMuscle }.distinct().sorted()
+    }
+
+    val filteredExercises = remember(combinedExercises, query, selectedMuscle) {
+        combinedExercises.filter { exercise ->
+            val matchesQuery = query.isBlank() ||
+                    exercise.name.contains(query, ignoreCase = true) ||
+                    exercise.primaryMuscle.contains(query, ignoreCase = true)
+            val matchesMuscle = selectedMuscle == "All" || exercise.primaryMuscle == selectedMuscle
+            matchesQuery && matchesMuscle
+        }
     }
 
     Box(
@@ -125,13 +147,13 @@ fun RoutineEditorScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = Color.White)
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = TextWhite)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (isEditing) "Editar Rotina" else "Criar Rotina",
                         style = AppTypography.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp),
-                        color = Color.White
+                        color = TextWhite
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
@@ -155,7 +177,7 @@ fun RoutineEditorScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 14.dp),
-                        textStyle = AppTypography.bodyMedium.copy(color = Color.White),
+                        textStyle = AppTypography.bodyMedium.copy(color = TextWhite),
                         cursorBrush = SolidColor(AccentBlue),
                         decorationBox = { innerTextField ->
                             if (routineName.isBlank()) {
@@ -229,7 +251,7 @@ fun RoutineEditorScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 14.dp, vertical = 14.dp),
-                                    textStyle = AppTypography.bodyMedium.copy(color = Color.White),
+                                    textStyle = AppTypography.bodyMedium.copy(color = TextWhite),
                                     cursorBrush = SolidColor(AccentBlue),
                                     decorationBox = { innerTextField ->
                                         if (query.isBlank()) {
@@ -290,7 +312,7 @@ fun RoutineEditorScreen(
                                 Text(
                                     text = libraryItem.name,
                                     style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                                    color = Color.White
+                                    color = TextWhite
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
@@ -387,7 +409,7 @@ fun RoutineEditorScreen(
                             Text(
                                 text = exercise.name,
                                 style = AppTypography.headlineLarge.copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
-                                color = Color.White
+                                color = TextWhite
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
@@ -455,7 +477,7 @@ fun RoutineEditorScreen(
                         Text(
                             text = if (isSaving) "A GUARDAR..." else "GUARDAR ROTINA",
                             style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
+                            color = TextWhite
                         )
                     }
                 }

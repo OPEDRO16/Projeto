@@ -36,6 +36,7 @@ fun RoutinesScreen(onStartWorkout: (Routine) -> Unit, onNavigateToEditor: () -> 
     var aiLoading by remember { mutableStateOf(false) }
     val muscleOptions = listOf("Peito", "Costas", "Pernas", "Braços", "Core")
     var selectedMuscles by remember { mutableStateOf(setOf<String>()) }
+    var aiTime by remember { mutableStateOf("1h") }
     val userId = FirebaseManager.auth.currentUser?.uid
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -54,7 +55,7 @@ fun RoutinesScreen(onStartWorkout: (Routine) -> Unit, onNavigateToEditor: () -> 
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = onNavigateToEditor, containerColor = AccentBlue, contentColor = Color.White, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) {
+            FloatingActionButton(onClick = onNavigateToEditor, containerColor = AccentBlue, contentColor = TextWhite, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) {
                 Icon(Icons.Default.Add, contentDescription = "Nova Rotina")
             }
         },
@@ -151,7 +152,7 @@ fun RoutinesScreen(onStartWorkout: (Routine) -> Unit, onNavigateToEditor: () -> 
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = "Treinador Pessoal AI", 
-                            color = Color.White, 
+                            color = TextWhite, 
                             style = AppTypography.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
@@ -171,7 +172,7 @@ fun RoutinesScreen(onStartWorkout: (Routine) -> Unit, onNavigateToEditor: () -> 
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "Qual é o teu objetivo principal?",
-                                color = Color.White.copy(alpha = 0.9f),
+                                color = TextWhite.copy(alpha = 0.9f),
                                 style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold)
                             )
                             Spacer(Modifier.height(8.dp))
@@ -193,7 +194,7 @@ fun RoutinesScreen(onStartWorkout: (Routine) -> Unit, onNavigateToEditor: () -> 
                                         Text(
                                             text = label,
                                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                            color = if (isSelected) Color.White else OutlineBorder,
+                                            color = if (isSelected) TextWhite else OutlineBorder,
                                             style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                         )
                                     }
@@ -205,7 +206,7 @@ fun RoutinesScreen(onStartWorkout: (Routine) -> Unit, onNavigateToEditor: () -> 
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "Quais os grupos musculares / divisão?",
-                                color = Color.White.copy(alpha = 0.9f),
+                                color = TextWhite.copy(alpha = 0.9f),
                                 style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold)
                             )
                             Spacer(Modifier.height(8.dp))
@@ -229,8 +230,48 @@ fun RoutinesScreen(onStartWorkout: (Routine) -> Unit, onNavigateToEditor: () -> 
                                         Text(
                                             text = label,
                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                            color = if (isSelected) Color.White else OutlineBorder,
+                                            color = if (isSelected) TextWhite else OutlineBorder,
                                             style = AppTypography.bodyMedium.copy(fontSize = 13.sp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Time Selection
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Quanto tempo tens para treinar?",
+                                color = TextPrimary,
+                                style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            val timeOptions = listOf(
+                                "30 min" to "⏱️ 30 min",
+                                "1h" to "⚡ 1 hora",
+                                "1h30" to "🔥 1h 30m",
+                                "2h" to "🏆 2 horas"
+                            )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                timeOptions.forEach { (value, label) ->
+                                    val isSelected = aiTime == value
+                                    Surface(
+                                        modifier = Modifier.clickable {
+                                            if (!aiLoading) aiTime = value
+                                        },
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = if (isSelected) AccentBlue.copy(alpha = 0.18f) else SurfaceLevel0,
+                                        border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, AccentBlue) else androidx.compose.foundation.BorderStroke(1.dp, OutlineBorder.copy(alpha = 0.2f))
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                            color = if (isSelected) AccentBlue else OutlineBorder,
+                                            style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                         )
                                     }
                                 }
@@ -264,7 +305,7 @@ fun RoutinesScreen(onStartWorkout: (Routine) -> Unit, onNavigateToEditor: () -> 
                                 aiLoading = true
                                 coroutineScope.launch {
                                     try {
-                                        val newRoutine = AiRoutineService.generateRoutine(finalObj, selectedMuscles.toList())
+                                        val newRoutine = AiRoutineService.generateRoutine(finalObj, selectedMuscles.toList(), aiTime)
                                         val finalRoutine = newRoutine.copy(userId = activeUser)
                                         FirebaseManager.firestore.collection("users").document(activeUser)
                                             .collection("routines").document(finalRoutine.id).set(finalRoutine)
@@ -273,6 +314,7 @@ fun RoutinesScreen(onStartWorkout: (Routine) -> Unit, onNavigateToEditor: () -> 
                                         showAiDialog = false
                                         aiObjective = ""
                                         selectedMuscles = emptySet()
+                                        aiTime = "1h"
                                         Toast.makeText(context, "Treino gerado com sucesso!", Toast.LENGTH_SHORT).show()
                                     } catch (e: Exception) {
                                         android.util.Log.e("AiRoutine", "Crash no GERAR", e)

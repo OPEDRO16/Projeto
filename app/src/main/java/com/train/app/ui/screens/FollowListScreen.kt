@@ -43,7 +43,7 @@ fun FollowListScreen(
         FirebaseManager.firestore.collection("users").document(currentUser.uid)
             .get()
             .addOnSuccessListener { doc ->
-                myProfile = doc.toObject(UserProfile::class.java)
+                myProfile = doc.toObject(UserProfile::class.java)?.apply { id = doc.id }
                 val profile = myProfile ?: run { isLoading = false; return@addOnSuccessListener }
 
                 // The friends list doubles as "following" in our current social model.
@@ -65,7 +65,9 @@ fun FollowListScreen(
                                 .whereIn("id", chunk)
                                 .get()
                                 .addOnSuccessListener { snap ->
-                                    temp.addAll(snap.toObjects(UserProfile::class.java))
+                                    temp.addAll(snap.documents.mapNotNull { d ->
+                                        d.toObject(UserProfile::class.java)?.apply { id = d.id }
+                                    })
                                     remaining--
                                     if (remaining == 0) {
                                         userList = temp.toList()
@@ -81,8 +83,9 @@ fun FollowListScreen(
                             .whereArrayContains("friends", currentUser.uid)
                             .get()
                             .addOnSuccessListener { snap ->
-                                userList = snap.toObjects(UserProfile::class.java)
-                                    .filter { it.id != currentUser.uid }
+                                userList = snap.documents.mapNotNull { d ->
+                                    d.toObject(UserProfile::class.java)?.apply { id = d.id }
+                                }.filter { it.id != currentUser.uid }
                                 isLoading = false
                             }
                             .addOnFailureListener { isLoading = false }

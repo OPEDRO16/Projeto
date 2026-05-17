@@ -48,6 +48,7 @@ import com.train.app.ui.theme.AppTypography
 import com.train.app.ui.theme.BackgroundDark
 import com.train.app.ui.theme.OutlineBorder
 import com.train.app.ui.theme.SurfaceLevel0
+import com.train.app.ui.theme.TextPrimary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -103,14 +104,14 @@ fun WorkoutDetailScreen(
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Voltar",
-                        tint = Color.White
+                        tint = TextPrimary
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Detalhe do Treino",
                     style = AppTypography.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp),
-                    color = Color.White
+                    color = TextPrimary
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -165,7 +166,7 @@ fun WorkoutDetailScreen(
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = Color.White
+                                color = TextPrimary
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(date, style = AppTypography.labelSmall, color = OutlineBorder)
@@ -275,7 +276,7 @@ private fun PremiumExerciseCard(
                     Text(
                         text = exercise.name.ifBlank { "Exercício" },
                         style = AppTypography.headlineLarge.copy(fontSize = 19.sp),
-                        color = Color.White
+                        color = TextPrimary
                     )
                 }
 
@@ -354,7 +355,7 @@ private fun TableValueCell(text: String) {
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Medium
         ),
-        color = Color.White,
+        color = TextPrimary,
         textAlign = TextAlign.Center
     )
 }
