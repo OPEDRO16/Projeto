@@ -26,6 +26,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +57,7 @@ import java.util.UUID
 
 @Composable
 fun RoutineEditorScreen(
+    routineId: String? = null,
     onSaveComplete: () -> Unit = {}
 ) {
     var routineName by remember { mutableStateOf("") }
@@ -65,6 +67,26 @@ fun RoutineEditorScreen(
     var showInlineLibrary by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var selectedMuscle by remember { mutableStateOf("All") }
+    val isEditing = !routineId.isNullOrBlank()
+
+    // Pre-load existing routine when editing
+    LaunchedEffect(routineId) {
+        val uid = Firebase.auth.currentUser?.uid ?: return@LaunchedEffect
+        if (!routineId.isNullOrBlank()) {
+            Firebase.firestore
+                .collection("users").document(uid)
+                .collection("routines").document(routineId)
+                .get()
+                .addOnSuccessListener { doc ->
+                    val routine = doc.toObject(Routine::class.java)
+                    if (routine != null) {
+                        routineName = routine.name
+                        selectedExercises.clear()
+                        selectedExercises.addAll(routine.exercises)
+                    }
+                }
+        }
+    }
 
     val allExercises = remember { ExerciseLibraryRepository.exercises }
     val muscleFilters = remember(allExercises) {
@@ -93,10 +115,14 @@ fun RoutineEditorScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Text("ROUTINE EDITOR", style = AppTypography.headlineLarge)
+                Text(
+                    if (isEditing) "EDITAR ROTINA" else "ROUTINE EDITOR",
+                    style = AppTypography.headlineLarge
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Adiciona exercícios da library para montar a tua rotina.",
+                    text = if (isEditing) "Altera os exercícios e o nome desta rotina."
+                           else "Adiciona exercícios da library para montar a tua rotina.",
                     style = AppTypography.bodyMedium,
                     color = OutlineBorder
                 )
@@ -255,7 +281,7 @@ fun RoutineEditorScreen(
                                                     WorkoutSet(),
                                                     WorkoutSet()
                                                 ),
-                                                isCompleted = false
+                                                completed = false
                                             )
                                         )
                                         showInlineLibrary = true
@@ -377,6 +403,7 @@ fun RoutineEditorScreen(
                                 saveRoutine(
                                     routineName = routineName,
                                     exercises = selectedExercises.toList(),
+                                    existingRoutineId = if (isEditing) routineId else null,
                                     onSavingChange = { isSaving = it },
                                     onError = { errorMessage = it },
                                     onSuccess = onSaveComplete
@@ -409,31 +436,24 @@ fun RoutineEditorScreen(
 private fun saveRoutine(
     routineName: String,
     exercises: List<Exercise>,
+    existingRoutineId: String? = null,
     onSavingChange: (Boolean) -> Unit,
     onError: (String?) -> Unit,
     onSuccess: () -> Unit
 ) {
     val userId = Firebase.auth.currentUser?.uid
-    if (userId == null) {
-        onError("Utilizador não autenticado")
-        return
-    }
-
-    if (routineName.isBlank()) {
-        onError("Indica um nome para a rotina")
-        return
-    }
-
-    if (exercises.isEmpty()) {
-        onError("Adiciona pelo menos um exercício")
-        return
-    }
+    if (userId == null) { onError("Utilizador não autenticado"); return }
+    if (routineName.isBlank()) { onError("Indica um nome para a rotina"); return }
+    if (exercises.isEmpty()) { onError("Adiciona pelo menos um exercício"); return }
 
     onError(null)
     onSavingChange(true)
 
+    val finalId = if (!existingRoutineId.isNullOrBlank()) existingRoutineId
+                  else UUID.randomUUID().toString()
+
     val routine = Routine(
-        id = UUID.randomUUID().toString(),
+        id = finalId,
         userId = userId,
         name = routineName,
         exercises = exercises
@@ -443,7 +463,7 @@ private fun saveRoutine(
         .collection("users")
         .document(userId)
         .collection("routines")
-        .document(routine.id)
+        .document(finalId)
         .set(routine)
         .addOnSuccessListener {
             onSavingChange(false)

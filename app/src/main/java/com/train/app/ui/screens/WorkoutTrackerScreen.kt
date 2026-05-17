@@ -1,6 +1,7 @@
 package com.train.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,6 +63,14 @@ import com.train.app.ui.theme.SurfaceLevel1
 import com.train.app.ui.theme.TextPrimary
 import com.train.app.viewmodels.WorkoutViewModel
 
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import com.train.app.data.ExerciseLibraryRepository
+import com.train.app.data.models.WorkoutSet
+import java.util.UUID
+
 @Composable
 fun WorkoutTrackerScreen(
     routine: Routine,
@@ -69,6 +78,24 @@ fun WorkoutTrackerScreen(
     workoutViewModel: WorkoutViewModel = viewModel()
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    var showInlineLibrary by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var selectedMuscle by remember { mutableStateOf("All") }
+
+    val allExercises = remember { ExerciseLibraryRepository.exercises }
+    val muscleFilters = remember(allExercises) {
+        listOf("All") + allExercises.map { it.primaryMuscle }.distinct().sorted()
+    }
+
+    val filteredExercises = remember(query, selectedMuscle) {
+        ExerciseLibraryRepository.filterExercises(
+            query = query,
+            primaryMuscle = selectedMuscle,
+            equipment = "All",
+            difficulty = "All",
+            category = "All"
+        )
+    }
 
     LaunchedEffect(routine.id) {
         workoutViewModel.startWorkout(routine)
@@ -257,6 +284,167 @@ fun WorkoutTrackerScreen(
                         )
                     }
                 }
+
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showInlineLibrary = !showInlineLibrary
+                            },
+                        shape = RoundedCornerShape(10.dp),
+                        color = AccentPurple.copy(alpha = 0.16f)
+                    ) {
+                        Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = if (showInlineLibrary) "FECHAR BIBLIOTECA" else "ADICIONAR EXERCÍCIO",
+                                style = AppTypography.labelSmall,
+                                color = AccentPurple,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                if (showInlineLibrary) {
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = SurfaceLevel0
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    text = "BIBLIOTECA DE EXERCÍCIOS",
+                                    style = AppTypography.labelSmall,
+                                    color = AccentPurple
+                                )
+
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = BackgroundDark
+                                ) {
+                                    BasicTextField(
+                                        value = query,
+                                        onValueChange = { query = it },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                                        textStyle = AppTypography.bodyMedium.copy(color = Color.White),
+                                        cursorBrush = SolidColor(AccentBlue),
+                                        decorationBox = { innerTextField ->
+                                            if (query.isBlank()) {
+                                                Text("Pesquisar exercício", color = OutlineBorder)
+                                            }
+                                            innerTextField()
+                                        }
+                                    )
+                                }
+
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    muscleFilters.forEach { option ->
+                                        Surface(
+                                            modifier = Modifier.clickable { selectedMuscle = option },
+                                            shape = RoundedCornerShape(999.dp),
+                                            color = if (selectedMuscle == option) AccentPurple.copy(alpha = 0.18f) else BackgroundDark
+                                        ) {
+                                            Text(
+                                                text = option,
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                                style = AppTypography.labelSmall,
+                                                color = if (selectedMuscle == option) AccentPurple else OutlineBorder
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    text = "${filteredExercises.size} exercícios encontrados",
+                                    style = AppTypography.labelSmall,
+                                    color = AccentBlue
+                                )
+                            }
+                        }
+                    }
+
+                    items(filteredExercises.size) { index ->
+                        val libraryItem = filteredExercises[index]
+                        val alreadyAdded = activeRoutine?.exercises?.any { it.name.equals(libraryItem.name, ignoreCase = true) } == true
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = SurfaceLevel0
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = libraryItem.name,
+                                        style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "${libraryItem.primaryMuscle} • ${libraryItem.equipment}",
+                                        style = AppTypography.bodyMedium,
+                                        color = OutlineBorder
+                                    )
+                                }
+
+                                Surface(
+                                    modifier = Modifier.clickable {
+                                        if (!alreadyAdded) {
+                                            val newExercise = Exercise(
+                                                id = "${libraryItem.id}_${UUID.randomUUID()}",
+                                                name = libraryItem.name,
+                                                instructions = libraryItem.instructions.joinToString("\n"),
+                                                sets = listOf(
+                                                    WorkoutSet(),
+                                                    WorkoutSet(),
+                                                    WorkoutSet()
+                                                ),
+                                                completed = false
+                                            )
+                                            workoutViewModel.addExerciseToActive(newExercise)
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (alreadyAdded) SurfaceLevel0 else AccentBlue.copy(alpha = 0.16f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = if (alreadyAdded) Icons.Default.Check else Icons.Default.Add,
+                                            contentDescription = null,
+                                            tint = if (alreadyAdded) OutlineBorder else AccentBlue
+                                        )
+                                        Text(
+                                            text = if (alreadyAdded) "ADDED" else "ADD",
+                                            style = AppTypography.labelSmall,
+                                            color = if (alreadyAdded) OutlineBorder else AccentBlue
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -301,7 +489,7 @@ private fun ExerciseActiveCard(
     onApplyPrevious: (Int) -> Unit,
     onAddSet: () -> Unit
 ) {
-    TrainCard {
+    TrainCard(modifier = Modifier.animateContentSize()) {
         Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),

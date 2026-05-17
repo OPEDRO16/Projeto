@@ -11,6 +11,9 @@ import com.train.app.ui.screens.MainScreen
 import com.train.app.ui.theme.BackgroundDark
 import com.train.app.ui.theme.TrainTheme // Certifica-te que o nome do teu tema é este
 
+import androidx.compose.runtime.*
+import com.train.app.ui.screens.LoginScreen
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,7 +33,20 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = BackgroundDark
                 ) {
-                    MainScreen()
+                    var isUserLoggedIn by remember { mutableStateOf(com.train.app.data.FirebaseManager.auth.currentUser != null) }
+                    
+                    // Listen to auth state changes to dynamically switch screens on logout
+                    LaunchedEffect(Unit) {
+                        com.train.app.data.FirebaseManager.auth.addAuthStateListener { auth ->
+                            isUserLoggedIn = auth.currentUser != null
+                        }
+                    }
+
+                    if (isUserLoggedIn) {
+                        MainScreen()
+                    } else {
+                        LoginScreen(onLoginSuccess = { isUserLoggedIn = true })
+                    }
                 }
             }
         }

@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.train.app.data.FirebaseManager
 import com.train.app.data.models.WorkoutSession
 import com.train.app.ui.components.TrainCard
+import com.train.app.ui.components.TrainPrimaryButton
 import com.train.app.ui.components.TrainSecondaryButton
 import com.train.app.ui.theme.AccentBlue
 import com.train.app.ui.theme.AccentPurple
@@ -60,17 +62,20 @@ private data class SummaryPr(
 @Composable
 fun WorkoutSummaryScreen(
     sessionId: String,
-    onBack: () -> Unit = {}
+    targetUserId: String? = null,
+    onBack: () -> Unit = {},
+    onNavigateToCreatePost: (String) -> Unit = {}
 ) {
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var session by remember { mutableStateOf<WorkoutSession?>(null) }
     var allSessions by remember { mutableStateOf<List<WorkoutSession>>(emptyList()) }
 
-    val userId = FirebaseManager.auth.currentUser?.uid
+    val currentAuthId = FirebaseManager.auth.currentUser?.uid
+    val effectiveUserId = targetUserId ?: currentAuthId
 
-    LaunchedEffect(userId, sessionId) {
-        if (userId == null) {
+    LaunchedEffect(effectiveUserId, sessionId) {
+        if (effectiveUserId == null) {
             isLoading = false
             errorMessage = "Utilizador não autenticado"
             return@LaunchedEffect
@@ -78,7 +83,7 @@ fun WorkoutSummaryScreen(
 
         FirebaseManager.firestore
             .collection("users")
-            .document(userId)
+            .document(effectiveUserId)
             .collection("sessions")
             .get()
             .addOnSuccessListener { snapshot ->
@@ -117,11 +122,20 @@ fun WorkoutSummaryScreen(
         item {
             Text("RESUMO DO TREINO", style = AppTypography.headlineLarge)
             Spacer(modifier = Modifier.height(10.dp))
-            TrainSecondaryButton(
-                text = "VOLTAR",
-                onClick = onBack,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TrainSecondaryButton(
+                    text = "VOLTAR",
+                    onClick = onBack,
+                    modifier = Modifier.weight(1f)
+                )
+                if (currentSession != null && (targetUserId == null || targetUserId == currentAuthId)) {
+                    TrainPrimaryButton(
+                        text = "PARTILHAR",
+                        onClick = { onNavigateToCreatePost(sessionId) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
 
         when {

@@ -2,13 +2,10 @@ package com.train.app.ui.screens
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -28,8 +25,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.train.app.data.models.Routine
 import com.train.app.navigation.Screen
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
 @Composable
 fun MainScreen() {
@@ -40,13 +35,10 @@ fun MainScreen() {
     var activeWorkoutRoutine by remember { mutableStateOf<Routine?>(null) }
 
     val bottomItems = listOf(
-        BottomNavItem("home", "Home", Icons.Default.Home),
-        BottomNavItem("routines", "Routines", Icons.Default.List),
-        BottomNavItem(Screen.ExerciseLibrary.route, "Library", Icons.Default.FitnessCenter),
-        BottomNavItem("evolution", "Progress", Icons.Default.BarChart),
-        BottomNavItem("feed", "Feed", Icons.Default.AccountCircle),
-        BottomNavItem("profile", "Profile", Icons.Default.Person),
-        BottomNavItem("chat", "AI", Icons.Default.Chat)
+        BottomNavItem("feed", "Início", Icons.Default.Home),
+        BottomNavItem("treino", "Treino", Icons.Default.FitnessCenter),
+        BottomNavItem("chat", "Chat", Icons.Default.Chat),
+        BottomNavItem("profile", "Perfil", Icons.Default.Person)
     )
 
     Scaffold(
@@ -61,7 +53,7 @@ fun MainScreen() {
                             onClick = {
                                 if (currentRoute != item.route) {
                                     navController.navigate(item.route) {
-                                        popUpTo("home") { saveState = true }
+                                        popUpTo("feed") { saveState = true }
                                         launchSingleTop = true
                                         restoreState = true
                                     }
@@ -77,36 +69,40 @@ fun MainScreen() {
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = "home",
+            startDestination = "feed",
             modifier = Modifier.padding(paddingValues)
         ) {
-            composable("home") { HomeScreen() }
+            composable("feed") { 
+                FeedScreen(
+                    onOpenPostComments = { postId ->
+                        navController.navigate(Screen.PostComments.createRoute(postId))
+                    },
+                    onOpenWorkoutDetail = { sessionId, postUserId ->
+                        navController.navigate(Screen.WorkoutSummary.createRoute(sessionId, postUserId))
+                    }
+                ) 
+            }
 
-            composable("routines") {
-                RoutinesScreen(
+            composable("treino") {
+                WorkoutDashboardScreen(
+                    onStartWorkout = { routine ->
+                        activeWorkoutRoutine = routine ?: Routine(name = "Treino Livre")
+                    },
                     onNavigateToEditor = { navController.navigate("routine_editor") },
-                    onStartWorkout = { routine: Routine -> activeWorkoutRoutine = routine }
-                )
-            }
-
-            composable(Screen.ExerciseLibrary.route) {
-                ExerciseLibraryScreen(
-                    onOpenExercise = { exerciseId ->
-                        navController.navigate(Screen.ExerciseLibraryDetail.createRoute(exerciseId))
+                    onNavigateToEditRoutine = { routineId ->
+                        navController.navigate("routine_editor/$routineId")
                     }
                 )
             }
 
-            composable("evolution") {
-                EvolutionScreen(
-                    onOpenExercise = { exerciseName ->
-                        val encodedName = URLEncoder.encode(exerciseName, StandardCharsets.UTF_8.toString())
-                        navController.navigate(Screen.ExerciseDetail.createRoute(encodedName))
+            composable("chat") {
+                ChatScreen(
+                    onOpenChat = { roomId ->
+                        navController.navigate("conversation/$roomId")
                     }
                 )
             }
 
-            composable("feed") { FeedScreen() }
 
             composable("profile") {
                 ProfileScreen(
@@ -115,11 +111,18 @@ fun MainScreen() {
                     },
                     onOpenCalendar = {
                         navController.navigate("workout_calendar")
+                    },
+                    onOpenEditProfile = {
+                        navController.navigate(Screen.EditProfile.route)
+                    },
+                    onOpenFriends = {
+                        navController.navigate(Screen.Friends.route)
+                    },
+                    onOpenExerciseLibrary = {
+                        navController.navigate(Screen.ExerciseLibrary.route)
                     }
                 )
             }
-
-            composable("chat") { ChatScreen() }
 
             composable("routine_editor") {
                 RoutineEditorScreen(
@@ -127,6 +130,36 @@ fun MainScreen() {
                 )
             }
 
+            composable(
+                route = "routine_editor/{routineId}",
+                arguments = listOf(navArgument("routineId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val routineId = backStackEntry.arguments?.getString("routineId")
+                RoutineEditorScreen(
+                    routineId = routineId,
+                    onSaveComplete = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.ExerciseLibrary.route) {
+                ExerciseLibraryScreen(
+                    onOpenExercise = { exerciseId ->
+                        navController.navigate(Screen.ExerciseLibraryDetail.createRoute(exerciseId))
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route = Screen.ExerciseLibraryDetail.route,
+                arguments = listOf(navArgument("exerciseId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val exerciseId = backStackEntry.arguments?.getString("exerciseId").orEmpty()
+                ExerciseLibraryDetailScreen(
+                    exerciseId = exerciseId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
             composable("workout_calendar") {
                 WorkoutCalendarScreen(
                     onBack = { navController.popBackStack() },
@@ -146,11 +179,91 @@ fun MainScreen() {
 
             composable(
                 route = Screen.WorkoutSummary.route,
+                arguments = listOf(
+                    navArgument("sessionId") { type = NavType.StringType },
+                    navArgument("userId") { 
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { backStackEntry ->
+                val sessionId = backStackEntry.arguments?.getString("sessionId").orEmpty()
+                val targetUserId = backStackEntry.arguments?.getString("userId")
+                WorkoutSummaryScreen(
+                    sessionId = sessionId, 
+                    targetUserId = targetUserId,
+                    onBack = {
+                        val popped = navController.popBackStack("treino", inclusive = false)
+                        if (!popped) {
+                            navController.popBackStack()
+                        }
+                    },
+                    onNavigateToCreatePost = { sId ->
+                        navController.navigate(Screen.CreatePost.createRoute(sId))
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.CreatePost.route,
                 arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val sessionId = backStackEntry.arguments?.getString("sessionId").orEmpty()
-                WorkoutSummaryScreen(sessionId = sessionId, onBack = { navController.popBackStack() })
+                CreatePostScreen(
+                    sessionId = sessionId,
+                    onBack = { navController.popBackStack() },
+                    onPostCreated = {
+                        // Pop backstack to reset 'treino' tab to root dashboard
+                        navController.popBackStack("treino", inclusive = false)
+                        
+                        // After posting, navigate to feed
+                        navController.navigate("feed") {
+                            popUpTo("feed") { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
             }
+
+            composable(
+                route = Screen.PostComments.route,
+                arguments = listOf(navArgument("postId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val postId = backStackEntry.arguments?.getString("postId").orEmpty()
+                PostCommentsScreen(
+                    postId = postId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(route = Screen.EditProfile.route) {
+                EditProfileScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(route = Screen.Friends.route) {
+                FriendsScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(
+                route = "conversation/{roomId}",
+                arguments = listOf(navArgument("roomId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val roomId = backStackEntry.arguments?.getString("roomId").orEmpty()
+                ConversationScreen(
+                    roomId = roomId,
+                    onBack = { navController.popBackStack() },
+                    onOpenPostComments = { postId ->
+                        navController.navigate(Screen.PostComments.createRoute(postId))
+                    },
+                    onOpenWorkoutDetail = { sessionId, userId ->
+                        navController.navigate(Screen.WorkoutSummary.createRoute(sessionId, userId))
+                    }
+                )
+            }
+
+
 
             composable(
                 route = Screen.ExerciseDetail.route,

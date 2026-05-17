@@ -1,35 +1,103 @@
 package com.train.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.ThumbUpOffAlt
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import com.google.firebase.firestore.FieldValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.os.Build
+import android.provider.MediaStore
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.Query
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material3.CircularProgressIndicator
+import com.train.app.data.models.ChatRoom
+import com.train.app.data.models.Message
+import android.widget.Toast
+import java.util.UUID
 import com.train.app.data.FirebaseManager
 import com.train.app.data.models.Post
-import com.train.app.ui.components.TrainChip
+import com.train.app.data.models.UserProfile
+import com.train.app.ui.components.UserAvatar
 import com.train.app.ui.theme.*
+import java.util.concurrent.TimeUnit
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeedScreen() {
+fun FeedScreen(
+    onOpenPostComments: (String) -> Unit = {},
+    onOpenWorkoutDetail: (String, String) -> Unit = { _, _ -> }
+) {
+    val context = LocalContext.current
     var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
+    var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
+    val currentUser = FirebaseManager.auth.currentUser
+
+    var selectedFilter by remember { mutableStateOf("publico") } // "publico" or "seguindo"
+    var showFilterDropdown by remember { mutableStateOf(false) }
+
+    var postToShare by remember { mutableStateOf<Post?>(null) }
+    var chatRooms by remember { mutableStateOf<List<ChatRoom>>(emptyList()) }
+
+    LaunchedEffect(currentUser?.uid) {
+        val myUid = currentUser?.uid
+        if (myUid != null) {
+            FirebaseManager.firestore.collection("chatRooms")
+                .whereArrayContains("members", myUid)
+                .addSnapshotListener { snap, _ ->
+                    if (snap != null) {
+                        chatRooms = snap.documents.mapNotNull { doc ->
+                            doc.toObject(ChatRoom::class.java)?.copy(id = doc.id)
+                        }
+                    }
+                }
+        }
+    }
 
     LaunchedEffect(Unit) {
         FirebaseManager.firestore.collection("posts")
@@ -41,100 +109,574 @@ fun FeedScreen() {
             }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark),
-        contentPadding = PaddingValues(vertical = 16.dp)
-    ) {
-        items(posts.size) { index ->
-            PostItem(posts[index])
+    LaunchedEffect(currentUser?.uid) {
+        if (currentUser != null) {
+            FirebaseManager.firestore.collection("users").document(currentUser.uid)
+                .addSnapshotListener { snapshot, _ ->
+                    if (snapshot != null && snapshot.exists()) {
+                        currentUserProfile = snapshot.toObject(UserProfile::class.java)
+                    }
+                }
+        }
+    }
+
+    val filteredPosts = remember(posts, selectedFilter, currentUserProfile) {
+        if (selectedFilter == "publico") {
+            posts.filter { 
+                it.visibility == "public" || 
+                (it.visibility == "friends" && currentUserProfile != null && it.userId in currentUserProfile!!.friends)
+            }
+        } else {
+            posts.filter { 
+                it.userId == currentUser?.uid || 
+                (currentUserProfile != null && it.userId in currentUserProfile!!.friends)
+            }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Box {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { showFilterDropdown = true }
+                        ) {
+                            Text(
+                                text = if (selectedFilter == "publico") "Público" else "Amigos",
+                                style = AppTypography.headlineLarge.copy(fontSize = 24.sp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color.White)
+                        }
+
+                        DropdownMenu(
+                            expanded = showFilterDropdown,
+                            onDismissRequest = { showFilterDropdown = false },
+                            modifier = Modifier.background(SurfaceLevel1)
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Público", color = if (selectedFilter == "publico") AccentBlue else Color.White, style = AppTypography.bodyLarge) },
+                                onClick = {
+                                    selectedFilter = "publico"
+                                    showFilterDropdown = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Amigos", color = if (selectedFilter == "seguindo") AccentBlue else Color.White, style = AppTypography.bodyLarge) },
+                                onClick = {
+                                    selectedFilter = "seguindo"
+                                    showFilterDropdown = false
+                                }
+                            )
+                        }
+                    }
+                },
+                actions = {},
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = BackgroundDark,
+                    titleContentColor = Color.White
+                )
+            )
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundDark)
+                .padding(paddingValues)
+        ) {
+            items(filteredPosts.size) { index ->
+                val post = filteredPosts[index]
+
+                HevyPostItem(
+                    post = post,
+                    currentUserId = currentUser?.uid,
+                    currentUserProfile = currentUserProfile,
+                    onOpenComments = onOpenPostComments,
+                    onOpenDetail = onOpenWorkoutDetail,
+                    onSharePost = { postToShare = it }
+                )
+            }
+        }
+    }
+
+    if (postToShare != null) {
+        ModalBottomSheet(
+            onDismissRequest = { postToShare = null },
+            containerColor = SurfaceLevel1,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = OutlineBorder) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp)
+            ) {
+                Text(
+                    text = "Partilhar Post",
+                    style = AppTypography.headlineLarge.copy(fontSize = 20.sp),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Escolhe uma conversa para enviar este post:",
+                    style = AppTypography.bodyMedium,
+                    color = OutlineBorder
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (chatRooms.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Não tens conversas ou grupos ativos.", color = OutlineBorder)
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.heightIn(max = 300.dp)
+                    ) {
+                        items(chatRooms.size) { index ->
+                            val room = chatRooms[index]
+                            ShareChatItem(
+                                room = room,
+                                currentUserId = currentUser?.uid.orEmpty(),
+                                onShare = {
+                                    val myUid = currentUser?.uid.orEmpty()
+                                    val myName = currentUserProfile?.name ?: "Parceiro"
+                                    val post = postToShare!!
+
+                                    val db = FirebaseManager.firestore
+                                    val newMsg = Message(
+                                        id = UUID.randomUUID().toString(),
+                                        senderId = myUid,
+                                        senderName = myName,
+                                        text = "Partilhou um post de ${post.userName}",
+                                        timestamp = System.currentTimeMillis(),
+                                        sharedPostId = post.id,
+                                        sharedPostContent = post.description,
+                                        sharedPostAuthorName = post.userName,
+                                        sharedPostImageUrl = post.imageUrl,
+                                        sharedWorkoutSessionId = post.workoutSessionId,
+                                        sharedPostUserId = post.userId
+                                    )
+
+                                    db.collection("chatRooms").document(room.id)
+                                        .collection("messages").document(newMsg.id).set(newMsg)
+                                        .addOnSuccessListener {
+                                            db.collection("chatRooms").document(room.id).update(
+                                                "lastMessageContent", "Partilhou um post de ${post.userName}",
+                                                "lastMessageSender", myName,
+                                                "lastMessageTime", System.currentTimeMillis()
+                                            )
+                                            Toast.makeText(context, "Post partilhado!", Toast.LENGTH_SHORT).show()
+                                            postToShare = null
+                                        }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-fun PostItem(post: Post) {
+fun HevyPostItem(
+    post: Post,
+    currentUserId: String?,
+    currentUserProfile: UserProfile?,
+    onOpenComments: (String) -> Unit,
+    onOpenDetail: (String, String) -> Unit,
+    onSharePost: (Post) -> Unit
+) {
+    val isLiked = currentUserId != null && post.likedBy.contains(currentUserId)
+    val localSentRequests = remember { mutableStateListOf<String>() }
+    
+    var posterProfile by remember(post.userId) { mutableStateOf<UserProfile?>(null) }
+    LaunchedEffect(post.userId) {
+        FirebaseManager.firestore.collection("users").document(post.userId)
+            .get()
+            .addOnSuccessListener { doc ->
+                if (doc.exists()) {
+                    posterProfile = doc.toObject(UserProfile::class.java)
+                }
+            }
+    }
+
+    var postBitmapState by remember(post.imageUrl) { mutableStateOf<Bitmap?>(null) }
+    val context = LocalContext.current
+
+    LaunchedEffect(post.imageUrl) {
+        if (!post.imageUrl.isNullOrBlank() && (post.imageUrl.startsWith("content://") || post.imageUrl.startsWith("file://"))) {
+            val loadedBitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val uri = Uri.parse(post.imageUrl)
+                com.train.app.ui.components.decodeUriSafely(context, uri, maxDimension = 1080)
+            }
+            postBitmapState = loadedBitmap
+        } else {
+            postBitmapState = null
+        }
+    }
+
+    var commentsCountState by remember(post.id, post.commentsCount) { mutableStateOf(post.commentsCount) }
+    LaunchedEffect(post.id) {
+        FirebaseManager.firestore
+            .collection("posts")
+            .document(post.id)
+            .collection("comments")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    commentsCountState = snapshot.size()
+                }
+            }
+    }
+
+    // Calcular tempo decorrido
+    val timeAgo = remember(post.timestamp) {
+        val now = System.currentTimeMillis()
+        val diff = now - post.timestamp
+        val hours = TimeUnit.MILLISECONDS.toHours(diff)
+        val minutes = TimeUnit.MILLISECONDS.toMinutes(diff)
+        if (hours > 24) "${TimeUnit.MILLISECONDS.toDays(diff)} d"
+        else if (hours > 0) "há $hours horas"
+        else if (minutes > 0) "há $minutes min"
+        else "agora"
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 24.dp)
     ) {
-        // Header Post
+        // Post Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(SurfaceLevel1)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(text = post.userName, style = AppTypography.bodyLarge, fontWeight = FontWeight.Bold)
-                Text(text = "Agora", style = AppTypography.labelMedium, color = OutlineBorder)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                UserAvatar(
+                    photoUrl = posterProfile?.photoUrl,
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(text = post.userName, style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                    Text(text = timeAgo, style = AppTypography.labelSmall, color = OutlineBorder)
+                }
+            }
+            val isFriend = currentUserProfile?.friends?.contains(post.userId) == true
+            val isMe = post.userId == currentUserId
+            val hasSentRequest = posterProfile?.friendRequests?.contains(currentUserId) == true || localSentRequests.contains(post.userId)
+            val hasReceivedRequest = currentUserProfile?.friendRequests?.contains(post.userId) == true
+
+            if (!isMe && !isFriend) {
+                when {
+                    hasReceivedRequest -> {
+                        Text(
+                            text = "Aceitar", 
+                            style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold), 
+                            color = AccentYellow,
+                            modifier = Modifier.clickable {
+                                if (currentUserId != null) {
+                                    FirebaseManager.firestore.runBatch { batch ->
+                                        val myRef = FirebaseManager.firestore.collection("users").document(currentUserId)
+                                        val theirRef = FirebaseManager.firestore.collection("users").document(post.userId)
+                                        batch.update(myRef, "friendRequests", FieldValue.arrayRemove(post.userId))
+                                        batch.update(myRef, "friends", FieldValue.arrayUnion(post.userId))
+                                        batch.update(theirRef, "friends", FieldValue.arrayUnion(currentUserId))
+                                    }
+                                }
+                            }
+                        )
+                    }
+                    hasSentRequest -> {
+                        Text(
+                            text = "Pendente", 
+                            style = AppTypography.bodyMedium, 
+                            color = OutlineBorder
+                        )
+                    }
+                    else -> {
+                        Text(
+                            text = "+ Amigo", 
+                            style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold), 
+                            color = AccentBlue,
+                            modifier = Modifier.clickable {
+                                if (currentUserId != null) {
+                                    localSentRequests.add(post.userId)
+                                    FirebaseManager.firestore.collection("users").document(post.userId)
+                                        .update("friendRequests", FieldValue.arrayUnion(currentUserId))
+                                }
+                            }
+                        )
+                    }
+                }
             }
         }
 
-        // Media + Tags
-        Box(
+        // Title and Stats
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
-                .background(SurfaceLevel1)
+                .clickable {
+                    if (post.workoutSessionId != null) {
+                        onOpenDetail(post.workoutSessionId!!, post.userId)
+                    }
+                }
+                .padding(horizontal = 16.dp)
         ) {
-            // Tag Overlaid
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(16.dp)
+            Text(
+                text = post.workoutName ?: "Treinamento",
+                style = AppTypography.headlineLarge.copy(fontSize = 18.sp),
+                color = Color.White
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(36.dp)
             ) {
-                TrainChip(text = post.category, isWarning = false)
+                Column {
+                    Text("Tempo", style = AppTypography.labelSmall, color = OutlineBorder)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("${post.workoutDuration ?: 0}min", style = AppTypography.bodyLarge, color = Color.White)
+                }
+                Column {
+                    Text("Volume", style = AppTypography.labelSmall, color = OutlineBorder)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("${post.workoutVolume?.toInt() ?: 0} kg", style = AppTypography.bodyLarge, color = Color.White)
+                }
             }
         }
 
-        // Interações
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Big Image Section or Premium Summary Card
+        val currentBitmap = postBitmapState
+        if (!post.imageUrl.isNullOrBlank() || currentBitmap != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.2f) // Slightly more standard than 1f for modern timeline aspect ratio
+                    .background(SurfaceLevel1)
+                    .clickable {
+                        if (post.workoutSessionId != null) {
+                            onOpenDetail(post.workoutSessionId!!, post.userId)
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (currentBitmap != null) {
+                    Image(
+                        bitmap = currentBitmap.asImageBitmap(),
+                        contentDescription = "Workout Photo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    CircularProgressIndicator(color = AccentBlue)
+                }
+            }
+        } else {
+            // Premium Summary Card for posts without image
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(SurfaceLevel1)
+                    .clickable {
+                        if (post.workoutSessionId != null) {
+                            onOpenDetail(post.workoutSessionId!!, post.userId)
+                        }
+                    }
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FitnessCenter,
+                        contentDescription = null,
+                        tint = AccentYellow,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "Treino Registado com Sucesso!",
+                            style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Ver exercícios e resumo completo",
+                            style = AppTypography.labelMedium,
+                            color = AccentYellow
+                        )
+                    }
+                }
+            }
+        }
+
+        // Action Bar (Like, Comment, Share)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 4.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row {
-                IconButton(onClick = { /* TODO */ }) {
-                    Icon(Icons.Default.FavoriteBorder, contentDescription = "Like", tint = TextPrimary)
+            IconButton(onClick = {
+                if (currentUserId != null) {
+                    val postRef = FirebaseManager.firestore.collection("posts").document(post.id)
+                    if (isLiked) {
+                        postRef.update("likedBy", FieldValue.arrayRemove(currentUserId))
+                    } else {
+                        postRef.update("likedBy", FieldValue.arrayUnion(currentUserId))
+                    }
                 }
-                IconButton(onClick = { /* TODO */ }) {
-                    Icon(Icons.Default.ChatBubbleOutline, contentDescription = "Comment", tint = TextPrimary)
-                }
-                IconButton(onClick = { /* TODO */ }) {
-                    Icon(Icons.Default.Share, contentDescription = "Share", tint = TextPrimary)
-                }
+            }) {
+                Icon(
+                    imageVector = if (isLiked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUpOffAlt, 
+                    contentDescription = "Like", 
+                    tint = if (isLiked) AccentBlue else Color.White
+                )
             }
-            IconButton(onClick = { /* TODO */ }) {
-                Icon(Icons.Default.BookmarkBorder, contentDescription = "Save", tint = TextPrimary)
+            Text(text = "${post.likedBy.size}", style = AppTypography.bodyMedium, color = Color.White)
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            IconButton(onClick = { onOpenComments(post.id) }) {
+                Icon(Icons.Default.ChatBubbleOutline, contentDescription = "Comment", tint = Color.White)
+            }
+            Text(text = "$commentsCountState", style = AppTypography.bodyMedium, color = Color.White)
+            
+            Spacer(modifier = Modifier.width(16.dp))
+
+            IconButton(onClick = { onSharePost(post) }) {
+                Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White)
             }
         }
 
-        // Legenda
+        // Liked By Text and Description
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            Text(text = "${post.likes} likes", style = AppTypography.labelMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = TextPrimary)) {
-                        append("${post.userName} ")
+            if (post.likedBy.isNotEmpty()) {
+                val likerName = if (isLiked) "ti" else "um utilizador"
+                val others = post.likedBy.size - 1
+                val likedText = if (others > 0) "Gostado por $likerName e outras $others pessoas" else "Gostado por $likerName"
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Small mock avatar stack could go here
+                    Text(
+                        text = likedText,
+                        style = AppTypography.bodyMedium,
+                        color = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            if (post.description.isNotBlank()) {
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) {
+                            append("${post.userName} ")
+                        }
+                        withStyle(style = SpanStyle(color = Color.White)) {
+                            append(post.description)
+                        }
+                    },
+                    style = AppTypography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ShareChatItem(
+    room: ChatRoom,
+    currentUserId: String,
+    onShare: () -> Unit
+) {
+    val otherMemberId = room.members.find { it != currentUserId }
+    var contactProfile by remember(otherMemberId) { mutableStateOf<UserProfile?>(null) }
+
+    LaunchedEffect(otherMemberId) {
+        if (otherMemberId != null && !room.isGroup) {
+            FirebaseManager.firestore.collection("users").document(otherMemberId)
+                .get()
+                .addOnSuccessListener { doc ->
+                    if (doc.exists()) {
+                        contactProfile = doc.toObject(UserProfile::class.java)
                     }
-                    withStyle(style = SpanStyle(color = TextPrimary)) {
-                        append(post.description)
-                    }
-                },
-                style = AppTypography.bodyLarge
+                }
+        }
+    }
+
+    val displayName = if (room.isGroup) room.name else contactProfile?.name ?: "Carregando..."
+    val photoUrl = if (room.isGroup) null else contactProfile?.photoUrl
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SurfaceLevel1, shape = RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (room.isGroup) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(AccentBlue.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Group, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+            }
+        } else {
+            UserAvatar(
+                photoUrl = photoUrl,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(BackgroundDark)
             )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Text(
+            text = displayName,
+            style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+            color = Color.White,
+            modifier = Modifier.weight(1f)
+        )
+
+        Button(
+            onClick = onShare,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = AccentBlue,
+                contentColor = Color.White
+            ),
+            shape = RoundedCornerShape(6.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+            modifier = Modifier.height(28.dp)
+        ) {
+            Text("Partilhar", style = AppTypography.labelSmall.copy(fontWeight = FontWeight.Bold))
         }
     }
 }

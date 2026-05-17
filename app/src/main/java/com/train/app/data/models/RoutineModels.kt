@@ -1,40 +1,47 @@
 package com.train.app.data.models
 
+import com.google.firebase.firestore.PropertyName
 import java.util.UUID
 
 /**
  * Representa uma rotina pré-definida de treino.
  */
 data class Routine(
-    val id: String = UUID.randomUUID().toString(),
-    val userId: String = "",
-    val name: String = "",
-    val focus: String = "Força",
-    val durationMinutes: Int = 0,
-    val lastTrained: Long? = null,
-    val exercises: List<Exercise> = emptyList()
+    var id: String = UUID.randomUUID().toString(),
+    var userId: String = "",
+    var name: String = "",
+    var focus: String = "Força",
+    var durationMinutes: Int = 0,
+    var lastTrained: Long? = null,
+    var exercises: List<Exercise> = emptyList()
 )
 
 /**
  * Representa um exercício individual dentro de uma rotina ou sessão.
  */
 data class Exercise(
-    val id: String = UUID.randomUUID().toString(),
-    val name: String = "",
-    val instructions: String = "",
-    val sets: List<WorkoutSet> = emptyList(),
-    val isCompleted: Boolean = false
+    var id: String = UUID.randomUUID().toString(),
+    var name: String = "",
+    var instructions: String = "",
+    var sets: List<WorkoutSet> = emptyList(),
+    @get:PropertyName("completed")
+    @set:PropertyName("completed")
+    @PropertyName("completed")
+    var completed: Boolean = false
 )
 
 /**
  * Representa uma série individual (set) de um exercício.
  */
 data class WorkoutSet(
-    val id: String = UUID.randomUUID().toString(),
-    val reps: Int = 0,
-    val weight: Float = 0f,
-    val completed: Boolean = false,
-    val type: SetType = SetType.NORMAL
+    var id: String = UUID.randomUUID().toString(),
+    var reps: Int = 0,
+    var weight: Float = 0f,
+    @get:PropertyName("completed")
+    @set:PropertyName("completed")
+    @PropertyName("completed")
+    var completed: Boolean = false,
+    var type: SetType = SetType.NORMAL
 )
 
 enum class SetType {
@@ -45,12 +52,12 @@ enum class SetType {
  * Representa uma sessão de treino ativa ou concluída (Histórico).
  */
 data class WorkoutSession(
-    val id: String = UUID.randomUUID().toString(),
-    val routineId: String = "",
-    val routineName: String = "",
-    val startTime: Long = System.currentTimeMillis(),
-    val endTime: Long = 0,
-    val durationMinutes: Int = 0,
-    val exercises: List<Exercise> = emptyList(),
-    val totalVolume: Float = 0f
+    var id: String = UUID.randomUUID().toString(),
+    var routineId: String = "",
+    var routineName: String = "",
+    var startTime: Long = System.currentTimeMillis(),
+    var endTime: Long = 0,
+    var durationMinutes: Int = 0,
+    var exercises: List<Exercise> = emptyList(),
+    var totalVolume: Float = 0f
 )

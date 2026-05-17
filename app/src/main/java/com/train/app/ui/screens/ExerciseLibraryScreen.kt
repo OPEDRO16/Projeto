@@ -14,8 +14,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,9 +45,11 @@ import com.train.app.ui.theme.BackgroundDark
 import com.train.app.ui.theme.OutlineBorder
 import com.train.app.ui.theme.SurfaceLevel0
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExerciseLibraryScreen(
-    onOpenExercise: (String) -> Unit = {}
+    onOpenExercise: (String) -> Unit = {},
+    onBack: () -> Unit = {}
 ) {
     var query by remember { mutableStateOf("") }
     var selectedMuscle by remember { mutableStateOf("All") }
@@ -63,69 +73,74 @@ fun ExerciseLibraryScreen(
         )
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Text("EXERCISE LIBRARY", style = AppTypography.headlineLarge)
-            Spacer(modifier = Modifier.padding(top = 6.dp))
-            Text(
-                text = "Pesquisa, filtra e abre exercícios da biblioteca base.",
-                style = AppTypography.bodyMedium,
-                color = OutlineBorder
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Biblioteca de Exercícios", style = AppTypography.headlineLarge.copy(fontSize = 20.sp)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = Color.White)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = BackgroundDark,
+                    titleContentColor = Color.White
+                )
             )
         }
-
-        item {
-            Surface(shape = RoundedCornerShape(10.dp), color = SurfaceLevel0) {
-                BasicTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 14.dp),
-                    textStyle = AppTypography.bodyMedium.copy(color = Color.White),
-                    cursorBrush = SolidColor(AccentBlue),
-                    decorationBox = { innerTextField ->
-                        if (query.isBlank()) {
-                            Text("Pesquisar exercício, músculo ou equipamento", color = OutlineBorder)
-                        }
-                        innerTextField()
-                    }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundDark)
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Text(
+                    text = "Pesquisa, filtra e abre exercícios da biblioteca base.",
+                    style = AppTypography.bodyMedium,
+                    color = OutlineBorder
                 )
             }
-        }
 
-        item {
-            FilterSection("MUSCLE", muscleFilters, selectedMuscle) { selectedMuscle = it }
-        }
+            item {
+                Surface(shape = RoundedCornerShape(10.dp), color = SurfaceLevel0) {
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                        textStyle = AppTypography.bodyMedium.copy(color = Color.White),
+                        cursorBrush = SolidColor(AccentBlue),
+                        decorationBox = { innerTextField ->
+                            if (query.isBlank()) {
+                                Text("Pesquisar exercício, músculo ou equipamento", color = OutlineBorder)
+                            }
+                            innerTextField()
+                        }
+                    )
+                }
+            }
 
-        item {
-            FilterSection("EQUIPMENT", equipmentFilters, selectedEquipment) { selectedEquipment = it }
-        }
+            item { FilterSection("MUSCLE", muscleFilters, selectedMuscle) { selectedMuscle = it } }
+            item { FilterSection("EQUIPMENT", equipmentFilters, selectedEquipment) { selectedEquipment = it } }
+            item { FilterSection("DIFFICULTY", difficultyFilters, selectedDifficulty) { selectedDifficulty = it } }
+            item { FilterSection("CATEGORY", categoryFilters, selectedCategory) { selectedCategory = it } }
 
-        item {
-            FilterSection("DIFFICULTY", difficultyFilters, selectedDifficulty) { selectedDifficulty = it }
-        }
+            item {
+                Text(
+                    text = "${filteredExercises.size} exercícios",
+                    style = AppTypography.labelSmall,
+                    color = AccentBlue
+                )
+            }
 
-        item {
-            FilterSection("CATEGORY", categoryFilters, selectedCategory) { selectedCategory = it }
-        }
-
-        item {
-            Text(
-                text = "${filteredExercises.size} exercícios",
-                style = AppTypography.labelSmall,
-                color = AccentBlue
-            )
-        }
-
-        items(filteredExercises) { exercise ->
-            ExerciseLibraryCard(exercise = exercise, onClick = { onOpenExercise(exercise.id) })
+            items(filteredExercises) { exercise ->
+                ExerciseLibraryCard(exercise = exercise, onClick = { onOpenExercise(exercise.id) })
+            }
         }
     }
 }

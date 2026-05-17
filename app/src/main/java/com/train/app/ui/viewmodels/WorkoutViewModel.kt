@@ -266,6 +266,16 @@ class WorkoutViewModel : ViewModel() {
         activeRoutine = routine.copy(exercises = updatedExercises)
     }
 
+    fun addExerciseToActive(exercise: Exercise) {
+        val routine = activeRoutine ?: return
+        if (routine.exercises.any { it.id == exercise.id }) return
+        val newExercise = exercise.copy(
+            sets = listOf(WorkoutSet())
+        )
+        activeRoutine = routine.copy(exercises = routine.exercises + newExercise)
+    }
+
+
     fun updateSet(exerciseId: String, setIndex: Int, weight: String, reps: String) {
         val routine = activeRoutine ?: return
 
