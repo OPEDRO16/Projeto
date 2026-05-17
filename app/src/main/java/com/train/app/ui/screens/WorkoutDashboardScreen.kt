@@ -23,8 +23,12 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FieldValue
 import com.train.app.data.FirebaseManager
 import com.train.app.data.models.Routine
+import com.train.app.data.ai.AiRoutineService
 import com.train.app.ui.components.TrainPrimaryButton
+import com.train.app.ui.components.TrainSecondaryButton
 import com.train.app.ui.theme.*
+import android.widget.Toast
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,6 +40,13 @@ fun WorkoutDashboardScreen(
     val currentUser = FirebaseManager.auth.currentUser
     var routines by remember { mutableStateOf<List<Routine>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+
+    var showAiDialog by remember { mutableStateOf(false) }
+    var aiObjective by remember { mutableStateOf("Hipertrofia") }
+    var aiLoading by remember { mutableStateOf(false) }
+    var selectedMuscles by remember { mutableStateOf(setOf<String>()) }
+    val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(currentUser?.uid) {
         if (currentUser != null) {
@@ -52,26 +63,7 @@ fun WorkoutDashboardScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Treino", style = AppTypography.headlineLarge.copy(fontSize = 24.sp)) },
-                actions = {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 16.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(AccentYellow.copy(alpha = 0.2f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text("PRO", color = AccentYellow, style = AppTypography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = BackgroundDark,
-                    titleContentColor = Color.White
-                )
-            )
-        }
+        containerColor = BackgroundDark
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -81,6 +73,24 @@ fun WorkoutDashboardScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Treino", style = AppTypography.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 24.sp), color = Color.White)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(AccentYellow.copy(alpha = 0.2f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text("PRO", color = AccentYellow, style = AppTypography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    }
+                }
+            }
+
             item {
                 Button(
                     onClick = { onStartWorkout(null) },
@@ -101,20 +111,26 @@ fun WorkoutDashboardScreen(
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Rotinas", style = AppTypography.headlineLarge.copy(fontSize = 20.sp))
                     Button(
                         onClick = onNavigateToEditor,
-                        modifier = Modifier.height(40.dp),
-                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = SurfaceLevel1),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+                        contentPadding = PaddingValues(vertical = 0.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Nova Rotina", color = Color.White, style = AppTypography.bodyMedium)
+                        Text("Nova Rotina", color = Color.White, style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                    }
+                    Button(
+                        onClick = { showAiDialog = true },
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                        contentPadding = PaddingValues(vertical = 0.dp)
+                    ) {
+                        Text("Nova Rotina AI", color = Color.White, style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold))
                     }
                 }
             }
@@ -123,7 +139,30 @@ fun WorkoutDashboardScreen(
                 item { CircularProgressIndicator(color = AccentBlue, modifier = Modifier.padding(32.dp)) }
             } else if (routines.isEmpty()) {
                 item {
-                    Text("Ainda não tens rotinas. Cria a primeira!", color = OutlineBorder, style = AppTypography.bodyMedium)
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Ainda não tens rotinas.", color = OutlineBorder, style = AppTypography.bodyMedium)
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Button(
+                            onClick = { showAiDialog = true },
+                            modifier = Modifier.width(280.dp).height(50.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                        ) {
+                            Text("GERAR COM AI", color = Color.White, style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = onNavigateToEditor,
+                            modifier = Modifier.width(280.dp).height(50.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceLevel1)
+                        ) {
+                            Text("Criar Manualmente", color = Color.White, style = AppTypography.bodyLarge)
+                        }
+                    }
                 }
             } else {
                 items(routines) { routine ->
@@ -146,6 +185,214 @@ fun WorkoutDashboardScreen(
             }
             item { Spacer(modifier = Modifier.height(24.dp)) }
         }
+    }
+
+    if (showAiDialog) {
+        var aiStatusText by remember { mutableStateOf("Iniciando IA...") }
+        LaunchedEffect(aiLoading) {
+            if (aiLoading) {
+                val statusLines = listOf(
+                    "Analisando objetivos...",
+                    "Selecionando os melhores exercícios...",
+                    "Ajustando repetições e volume...",
+                    "Finalizando treino customizado..."
+                )
+                for (line in statusLines) {
+                    aiStatusText = line
+                    kotlinx.coroutines.delay(450)
+                }
+            }
+        }
+
+        val objectiveOptions = listOf(
+            "Hipertrofia" to "Hipertrofia",
+            "Ganhar Força" to "Força",
+            "Saudável" to "Saudável",
+            "Definição" to "Definição",
+            "Calistenia" to "Calistenia"
+        )
+
+        val splitOptions = listOf(
+            "Peito" to "Peito",
+            "Costas" to "Costas",
+            "Pernas" to "Pernas",
+            "Bíceps" to "Bíceps",
+            "Tríceps" to "Tríceps",
+            "Ombros" to "Ombros",
+            "Core" to "Core / Abs",
+            "Corpo Inteiro" to "Corpo Inteiro"
+        )
+
+        AlertDialog(
+            onDismissRequest = { if (!aiLoading) showAiDialog = false },
+            containerColor = SurfaceLevel1,
+            title = { 
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Treinador Pessoal AI", 
+                        color = Color.White, 
+                        style = AppTypography.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Crie uma rotina científica de forma instantânea.",
+                        color = OutlineBorder,
+                        style = AppTypography.bodySmall
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Objective Selection
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Qual é o teu objetivo principal?",
+                            color = Color.White.copy(alpha = 0.9f),
+                            style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            objectiveOptions.forEach { (value, label) ->
+                                val isSelected = aiObjective == value || (aiObjective.isEmpty() && value == "Hipertrofia")
+                                Surface(
+                                    modifier = Modifier.clickable {
+                                        if (!aiLoading) aiObjective = value
+                                    },
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = if (isSelected) AccentBlue.copy(alpha = 0.18f) else BackgroundDark,
+                                    border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, AccentBlue) else androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2E2D2D))
+                                ) {
+                                    Text(
+                                        text = label,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                        color = if (isSelected) AccentBlue else OutlineBorder,
+                                        style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Split Selection
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Quais os grupos musculares / divisão?",
+                            color = Color.White.copy(alpha = 0.9f),
+                            style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            splitOptions.forEach { (value, label) ->
+                                val isSelected = selectedMuscles.contains(value)
+                                Surface(
+                                    modifier = Modifier.clickable {
+                                        if (!aiLoading) {
+                                            selectedMuscles = if (isSelected) selectedMuscles - value else selectedMuscles + value
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) AccentBlue.copy(alpha = 0.18f) else BackgroundDark,
+                                    border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, AccentBlue) else androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2E2D2D))
+                                ) {
+                                    Text(
+                                        text = label,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        color = if (isSelected) AccentBlue else OutlineBorder,
+                                        style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (aiLoading) {
+                        Spacer(Modifier.height(8.dp))
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(color = AccentBlue, strokeWidth = 3.dp)
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = aiStatusText,
+                                color = AccentBlue,
+                                style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (!aiLoading) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val activeUser = currentUser?.uid ?: "test_user_ai"
+                                val finalObj = if (aiObjective.isEmpty()) "Hipertrofia" else aiObjective
+                                aiLoading = true
+                                coroutineScope.launch {
+                                    try {
+                                        val newRoutine = AiRoutineService.generateRoutine(finalObj, selectedMuscles.toList())
+                                        val finalRoutine = newRoutine.copy(userId = activeUser)
+                                        FirebaseManager.firestore.collection("users").document(activeUser)
+                                            .collection("routines").document(finalRoutine.id).set(finalRoutine)
+                                            
+                                        aiLoading = false
+                                        showAiDialog = false
+                                        aiObjective = "Hipertrofia"
+                                        selectedMuscles = emptySet()
+                                        Toast.makeText(context, "Treino gerado com sucesso!", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("AiRoutine", "Crash no GERAR", e)
+                                        aiLoading = false
+                                        Toast.makeText(context, "Erro: ${e.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                        color = AccentBlue
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("GERAR COM AI", color = Color.White, style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                if (!aiLoading) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showAiDialog = false },
+                        shape = RoundedCornerShape(12.dp),
+                        color = SurfaceLevel1,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2E2D2D))
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("CANCELAR", color = OutlineBorder, style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                        }
+                    }
+                }
+            }
+        )
     }
 }
 

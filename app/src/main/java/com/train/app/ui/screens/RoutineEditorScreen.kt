@@ -12,12 +12,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,12 +56,14 @@ import com.train.app.ui.theme.AppTypography
 import com.train.app.ui.theme.BackgroundDark
 import com.train.app.ui.theme.OutlineBorder
 import com.train.app.ui.theme.SurfaceLevel0
+import com.train.app.ui.theme.SurfaceLevel1
 import java.util.UUID
 
 @Composable
 fun RoutineEditorScreen(
     routineId: String? = null,
-    onSaveComplete: () -> Unit = {}
+    onSaveComplete: () -> Unit = {},
+    onBack: () -> Unit = {}
 ) {
     var routineName by remember { mutableStateOf("") }
     val selectedExercises = remember { mutableStateListOf<Exercise>() }
@@ -115,14 +120,24 @@ fun RoutineEditorScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Text(
-                    if (isEditing) "EDITAR ROTINA" else "ROUTINE EDITOR",
-                    style = AppTypography.headlineLarge
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = Color.White)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isEditing) "Editar Rotina" else "Criar Rotina",
+                        style = AppTypography.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp),
+                        color = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = if (isEditing) "Altera os exercícios e o nome desta rotina."
-                           else "Adiciona exercícios da library para montar a tua rotina.",
+                           else "Adiciona exercícios para montar a tua rotina personalizada.",
                     style = AppTypography.bodyMedium,
                     color = OutlineBorder
                 )
@@ -130,20 +145,21 @@ fun RoutineEditorScreen(
 
             item {
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = SurfaceLevel0
+                    shape = RoundedCornerShape(12.dp),
+                    color = SurfaceLevel1,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2E2D2D))
                 ) {
                     BasicTextField(
                         value = routineName,
                         onValueChange = { routineName = it },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
                         textStyle = AppTypography.bodyMedium.copy(color = Color.White),
                         cursorBrush = SolidColor(AccentBlue),
                         decorationBox = { innerTextField ->
                             if (routineName.isBlank()) {
-                                Text("Nome da rotina", color = OutlineBorder)
+                                Text("Nome da rotina (ex: Costas & Bíceps)", color = OutlineBorder)
                             }
                             innerTextField()
                         }
@@ -159,16 +175,28 @@ fun RoutineEditorScreen(
                             errorMessage = null
                             showInlineLibrary = !showInlineLibrary
                         },
-                    shape = RoundedCornerShape(10.dp),
-                    color = AccentPurple.copy(alpha = 0.16f)
+                    shape = RoundedCornerShape(12.dp),
+                    color = AccentBlue.copy(alpha = 0.16f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AccentBlue.copy(alpha = 0.4f))
                 ) {
-                    Text(
-                        text = if (showInlineLibrary) "FECHAR BIBLIOTECA" else "ADICIONAR EXERCÍCIOS DA LIBRARY",
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-                        style = AppTypography.labelSmall,
-                        color = AccentPurple,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (showInlineLibrary) Icons.Default.Close else Icons.Default.Add,
+                            contentDescription = null,
+                            tint = AccentBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (showInlineLibrary) "FECHAR BIBLIOTECA" else "ADICIONAR EXERCÍCIOS",
+                            style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = AccentBlue
+                        )
+                    }
                 }
             }
 
@@ -176,18 +204,19 @@ fun RoutineEditorScreen(
                 item {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = SurfaceLevel0
+                        color = SurfaceLevel1,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2E2D2D))
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(14.dp),
+                                .padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                text = "BIBLIOTECA DE EXERCÍCIOS",
-                                style = AppTypography.labelSmall,
-                                color = AccentPurple
+                                text = "PESQUISAR NA BIBLIOTECA",
+                                style = AppTypography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = AccentBlue
                             )
 
                             Surface(
@@ -216,16 +245,18 @@ fun RoutineEditorScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 muscleFilters.forEach { option ->
+                                    val isSelected = selectedMuscle == option
                                     Surface(
                                         modifier = Modifier.clickable { selectedMuscle = option },
                                         shape = RoundedCornerShape(999.dp),
-                                        color = if (selectedMuscle == option) AccentPurple.copy(alpha = 0.18f) else BackgroundDark
+                                        color = if (isSelected) AccentBlue.copy(alpha = 0.18f) else BackgroundDark,
+                                        border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, AccentBlue) else null
                                     ) {
                                         Text(
                                             text = option,
                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                            style = AppTypography.labelSmall,
-                                            color = if (selectedMuscle == option) AccentPurple else OutlineBorder
+                                            style = AppTypography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = if (isSelected) AccentBlue else OutlineBorder
                                         )
                                     }
                                 }
@@ -245,7 +276,8 @@ fun RoutineEditorScreen(
 
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = SurfaceLevel0
+                        color = SurfaceLevel1,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2E2D2D))
                     ) {
                         Row(
                             modifier = Modifier
@@ -289,7 +321,7 @@ fun RoutineEditorScreen(
                                     }
                                 },
                                 shape = RoundedCornerShape(8.dp),
-                                color = if (alreadyAdded) SurfaceLevel0 else AccentBlue.copy(alpha = 0.16f)
+                                color = if (alreadyAdded) SurfaceLevel1 else AccentBlue.copy(alpha = 0.16f)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -302,7 +334,7 @@ fun RoutineEditorScreen(
                                         tint = if (alreadyAdded) OutlineBorder else AccentBlue
                                     )
                                     Text(
-                                        text = if (alreadyAdded) "ADDED" else "ADD",
+                                        text = if (alreadyAdded) "ADICIONADO" else "ADICIONAR",
                                         style = AppTypography.labelSmall,
                                         color = if (alreadyAdded) OutlineBorder else AccentBlue
                                     )
@@ -324,12 +356,13 @@ fun RoutineEditorScreen(
             if (selectedExercises.isEmpty()) {
                 item {
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = SurfaceLevel0
+                        shape = RoundedCornerShape(12.dp),
+                        color = SurfaceLevel1,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2E2D2D))
                     ) {
                         Text(
                             text = "Ainda não adicionaste exercícios.",
-                            modifier = Modifier.padding(14.dp),
+                            modifier = Modifier.padding(16.dp),
                             style = AppTypography.bodyMedium,
                             color = OutlineBorder
                         )
@@ -340,24 +373,25 @@ fun RoutineEditorScreen(
             itemsIndexed(selectedExercises) { index, exercise ->
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = SurfaceLevel0
+                    color = SurfaceLevel1,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2E2D2D))
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
+                            .padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = exercise.name,
-                                style = AppTypography.headlineLarge.copy(fontSize = 18.sp),
+                                style = AppTypography.headlineLarge.copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
                                 color = Color.White
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "${exercise.sets.size} sets base",
+                                text = "${exercise.sets.size} séries base",
                                 style = AppTypography.bodyMedium,
                                 color = OutlineBorder
                             )
@@ -381,12 +415,13 @@ fun RoutineEditorScreen(
             if (errorMessage != null) {
                 item {
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = SurfaceLevel0
+                        shape = RoundedCornerShape(12.dp),
+                        color = SurfaceLevel1,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentYellow.copy(alpha = 0.3f))
                     ) {
                         Text(
                             text = errorMessage ?: "Erro",
-                            modifier = Modifier.padding(14.dp),
+                            modifier = Modifier.padding(16.dp),
                             color = AccentYellow,
                             style = AppTypography.bodyMedium
                         )
@@ -410,16 +445,19 @@ fun RoutineEditorScreen(
                                 )
                             }
                         },
-                    shape = RoundedCornerShape(10.dp),
-                    color = AccentBlue.copy(alpha = 0.16f)
+                    shape = RoundedCornerShape(12.dp),
+                    color = AccentBlue
                 ) {
-                    Text(
-                        text = if (isSaving) "A GUARDAR..." else "GUARDAR ROTINA",
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-                        style = AppTypography.labelSmall,
-                        color = AccentBlue,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isSaving) "A GUARDAR..." else "GUARDAR ROTINA",
+                            style = AppTypography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+                    }
                 }
             }
         }

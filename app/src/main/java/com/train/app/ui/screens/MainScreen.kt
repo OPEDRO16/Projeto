@@ -126,7 +126,8 @@ fun MainScreen() {
 
             composable("routine_editor") {
                 RoutineEditorScreen(
-                    onSaveComplete = { navController.popBackStack() }
+                    onSaveComplete = { navController.popBackStack() },
+                    onBack = { navController.popBackStack() }
                 )
             }
 
@@ -137,7 +138,8 @@ fun MainScreen() {
                 val routineId = backStackEntry.arguments?.getString("routineId")
                 RoutineEditorScreen(
                     routineId = routineId,
-                    onSaveComplete = { navController.popBackStack() }
+                    onSaveComplete = { navController.popBackStack() },
+                    onBack = { navController.popBackStack() }
                 )
             }
 
@@ -157,7 +159,10 @@ fun MainScreen() {
                 val exerciseId = backStackEntry.arguments?.getString("exerciseId").orEmpty()
                 ExerciseLibraryDetailScreen(
                     exerciseId = exerciseId,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onOpenWorkout = { sessionId ->
+                        navController.navigate(Screen.WorkoutDetail.createRoute(sessionId))
+                    }
                 )
             }
             composable("workout_calendar") {
@@ -174,7 +179,17 @@ fun MainScreen() {
                 arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val sessionId = backStackEntry.arguments?.getString("sessionId").orEmpty()
-                WorkoutDetailScreen(sessionId = sessionId, onBack = { navController.popBackStack() })
+                WorkoutSummaryScreen(
+                    sessionId = sessionId,
+                    targetUserId = null,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToCreatePost = { sId ->
+                        navController.navigate(Screen.CreatePost.createRoute(sId))
+                    },
+                    onOpenPostComments = { postId ->
+                        navController.navigate(Screen.PostComments.createRoute(postId))
+                    }
+                )
             }
 
             composable(
@@ -201,6 +216,9 @@ fun MainScreen() {
                     },
                     onNavigateToCreatePost = { sId ->
                         navController.navigate(Screen.CreatePost.createRoute(sId))
+                    },
+                    onOpenPostComments = { postId ->
+                        navController.navigate(Screen.PostComments.createRoute(postId))
                     }
                 )
             }
@@ -259,6 +277,9 @@ fun MainScreen() {
                     },
                     onOpenWorkoutDetail = { sessionId, userId ->
                         navController.navigate(Screen.WorkoutSummary.createRoute(sessionId, userId))
+                    },
+                    onOpenExerciseDetail = { exerciseName ->
+                        navController.navigate(Screen.ExerciseDetail.createRoute(java.net.URLEncoder.encode(exerciseName, java.nio.charset.StandardCharsets.UTF_8.toString())))
                     }
                 )
             }
@@ -296,7 +317,9 @@ fun MainScreen() {
                 routine = routine,
                 onFinish = { sessionId ->
                     activeWorkoutRoutine = null
-                    navController.navigate(Screen.WorkoutSummary.createRoute(sessionId))
+                    if (sessionId.isNotEmpty()) {
+                        navController.navigate(Screen.WorkoutSummary.createRoute(sessionId))
+                    }
                 }
             )
         }

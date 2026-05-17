@@ -53,7 +53,8 @@ fun ConversationScreen(
     roomId: String,
     onBack: () -> Unit,
     onOpenPostComments: (String) -> Unit = {},
-    onOpenWorkoutDetail: (String, String?) -> Unit = { _, _ -> }
+    onOpenWorkoutDetail: (String, String?) -> Unit = { _, _ -> },
+    onOpenExerciseDetail: (String) -> Unit = {}
 ) {
     val currentUser = FirebaseManager.auth.currentUser
     val context = LocalContext.current
@@ -265,7 +266,7 @@ fun ConversationScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = SurfaceLevel1,
+                    containerColor = BackgroundDark,
                     titleContentColor = Color.White
                 )
             )
@@ -332,7 +333,8 @@ fun ConversationScreen(
                             }
                         },
                         onOpenPostComments = onOpenPostComments,
-                        onOpenWorkoutDetail = onOpenWorkoutDetail
+                        onOpenWorkoutDetail = onOpenWorkoutDetail,
+                        onOpenExerciseDetail = onOpenExerciseDetail
                     )
                 }
             }
@@ -860,7 +862,8 @@ fun MessageRow(
     isGroup: Boolean,
     onImportRoutine: (String, String) -> Unit,
     onOpenPostComments: (String) -> Unit,
-    onOpenWorkoutDetail: (String, String?) -> Unit
+    onOpenWorkoutDetail: (String, String?) -> Unit,
+    onOpenExerciseDetail: (String) -> Unit
 ) {
     val align = if (isMe) Alignment.End else Alignment.Start
     val bubbleColor = if (isMe) AccentBlue else SurfaceLevel1
@@ -957,8 +960,61 @@ fun MessageRow(
                     }
                 }
             } else if (message.sharedPostId != null) {
-                // Shared Post Bubble
-                Column(
+                val isExercise = message.sharedPostId.startsWith("EXERCISE:")
+                if (isExercise) {
+                    val exerciseName = message.sharedPostId.removePrefix("EXERCISE:")
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onOpenExerciseDetail(exerciseName)
+                            }
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = AccentYellow, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Exercício Partilhado",
+                                style = AppTypography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = AccentYellow
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = exerciseName,
+                            style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = message.sharedPostContent.orEmpty(),
+                            style = AppTypography.bodyMedium,
+                            color = OutlineBorder
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Button(
+                            onClick = { onOpenExerciseDetail(exerciseName) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AccentYellow,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(6.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(32.dp)
+                        ) {
+                            Text(
+                                "VER EXERCÍCIO",
+                                style = AppTypography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
+                } else {
+                    // Shared Post Bubble
+                    Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
@@ -1046,7 +1102,8 @@ fun MessageRow(
                         )
                     }
                 }
-            } else {
+            }
+        } else {
                 // Text Message
                 Text(
                     text = message.text,

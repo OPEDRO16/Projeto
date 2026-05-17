@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,6 +47,7 @@ fun CreatePostScreen(
 ) {
     val context = LocalContext.current
     var description by remember { mutableStateOf("") }
+    var workoutNameInput by remember { mutableStateOf("") }
     var visibility by remember { mutableStateOf("public") } // "public" or "friends"
     var isPosting by remember { mutableStateOf(false) }
     
@@ -100,7 +102,9 @@ fun CreatePostScreen(
                 .document(sessionId)
                 .get()
                 .addOnSuccessListener { snapshot ->
-                    session = snapshot.toObject(WorkoutSession::class.java)
+                    val s = snapshot.toObject(WorkoutSession::class.java)
+                    session = s
+                    workoutNameInput = s?.routineName?.ifBlank { "Treinamento" } ?: "Treinamento"
                     isLoadingSession = false
                 }
                 .addOnFailureListener {
@@ -113,10 +117,23 @@ fun CreatePostScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundDark)
-            .padding(horizontal = 20.dp, vertical = 24.dp)
+            .padding(16.dp)
     ) {
-        Text("NOVA PARTILHA", style = AppTypography.headlineLarge, color = TextPrimary)
-        Spacer(modifier = Modifier.height(24.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = Color.White)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Nova Partilha",
+                style = AppTypography.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp),
+                color = Color.White
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
 
         if (isLoadingSession) {
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -127,8 +144,17 @@ fun CreatePostScreen(
             Spacer(modifier = Modifier.height(16.dp))
             TrainSecondaryButton(text = "VOLTAR", onClick = onBack, modifier = Modifier.fillMaxWidth())
         } else {
-            // Formulário de Criação
-            
+            // Nome do Treino
+            Text("NOME DO TREINO", style = AppTypography.labelMedium, color = OutlineBorder)
+            Spacer(modifier = Modifier.height(8.dp))
+            TrainInput(
+                value = workoutNameInput,
+                onValueChange = { workoutNameInput = it },
+                placeholder = "Ex: Treino de Perna, Fullbody, etc."
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Descrição
             Text("O que tens a dizer sobre este treino?", style = AppTypography.labelMedium, color = OutlineBorder)
             Spacer(modifier = Modifier.height(8.dp))
@@ -224,7 +250,7 @@ fun CreatePostScreen(
                                 description = description,
                                 category = "Treino",
                                 workoutSessionId = sessionId,
-                                workoutName = session!!.routineName.ifBlank { "Treino" },
+                                workoutName = workoutNameInput.ifBlank { "Treino" },
                                 workoutVolume = session!!.totalVolume,
                                 workoutDuration = session!!.durationMinutes,
                                 visibility = visibility,

@@ -266,6 +266,21 @@ class WorkoutViewModel : ViewModel() {
         activeRoutine = routine.copy(exercises = updatedExercises)
     }
 
+    fun removeSet(exerciseId: String, setIndex: Int) {
+        val routine = activeRoutine ?: return
+
+        val updatedExercises = routine.exercises.map { exercise ->
+            if (exercise.id != exerciseId) return@map exercise
+            if (setIndex !in exercise.sets.indices) return@map exercise
+
+            val updatedSets = exercise.sets.toMutableList()
+            updatedSets.removeAt(setIndex)
+            exercise.copy(sets = updatedSets)
+        }
+
+        activeRoutine = routine.copy(exercises = updatedExercises)
+    }
+
     fun addExerciseToActive(exercise: Exercise) {
         val routine = activeRoutine ?: return
         if (routine.exercises.any { it.id == exercise.id }) return
@@ -273,6 +288,11 @@ class WorkoutViewModel : ViewModel() {
             sets = listOf(WorkoutSet())
         )
         activeRoutine = routine.copy(exercises = routine.exercises + newExercise)
+    }
+
+    fun removeExerciseFromActive(exerciseId: String) {
+        val routine = activeRoutine ?: return
+        activeRoutine = routine.copy(exercises = routine.exercises.filter { it.id != exerciseId })
     }
 
 

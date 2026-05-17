@@ -136,7 +136,7 @@ fun FriendsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = SurfaceLevel1,
+                    containerColor = BackgroundDark,
                     titleContentColor = Color.White
                 )
             )

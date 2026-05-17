@@ -9,53 +9,135 @@ import java.util.UUID
 
 object AiRoutineService {
     suspend fun generateRoutine(objective: String, muscleGroups: List<String>): Routine {
-        // Simula processamento da LLM
-        delay(2000)
+        // Simula processamento da IA com um tempo visível para feedback premium
+        delay(1800)
 
-        val groups = if (muscleGroups.isEmpty()) "Full Body" else muscleGroups.joinToString(" & ")
-        val objTrim = objective.takeIf { it.isNotBlank() } ?: "Geral"
-        val name = "AI: $groups ($objTrim)"
-        
+        val objTrim = objective.takeIf { it.isNotBlank() } ?: "Hipertrofia"
+        val splitName = if (muscleGroups.isEmpty()) "Corpo Inteiro" else muscleGroups.joinToString(" & ")
+        val name = "Treino IA: $splitName"
+
         val exercises = mutableListOf<Exercise>()
-        
-        // Lógica "Caveman LLM"
-        val isStrength = objective.contains("força", ignoreCase = true)
-        val reps = if (isStrength) 5 else 10
-        val setsCount = if (isStrength) 5 else 3
-        
-        if (muscleGroups.isEmpty() || muscleGroups.contains("Peito")) {
-            exercises.add(createExercise("Supino Plano", reps, setsCount))
+
+        // Configuração de repetições e séries com base no objetivo
+        val isStrength = objTrim.contains("força", ignoreCase = true) || objTrim.contains("force", ignoreCase = true)
+        val isResilience = objTrim.contains("definição", ignoreCase = true) || objTrim.contains("resistência", ignoreCase = true) || objTrim.contains("saudável", ignoreCase = true)
+        val isCalisthenics = objTrim.contains("calistenia", ignoreCase = true) || objTrim.contains("calisthenics", ignoreCase = true)
+
+        val compoundReps = when {
+            isStrength -> 5
+            isResilience -> 15
+            else -> 10 // Hipertrofia padrão
         }
-        if (muscleGroups.isEmpty() || muscleGroups.contains("Costas")) {
-            exercises.add(createExercise("Puxada na Polia", reps, setsCount))
-            exercises.add(createExercise("Remada Curvada", reps, setsCount))
+
+        val isolationReps = when {
+            isStrength -> 8
+            isResilience -> 15
+            else -> 12 // Hipertrofia padrão
         }
-        if (muscleGroups.isEmpty() || muscleGroups.contains("Pernas")) {
-            exercises.add(createExercise("Agachamento Livre", reps, setsCount))
-            exercises.add(createExercise("Leg Press", reps, setsCount))
+
+        val setsCount = when {
+            isStrength -> 5
+            isResilience -> 3
+            else -> 4 // Hipertrofia padrão (4 séries)
         }
-        if (muscleGroups.contains("Braços")) {
-            exercises.add(createExercise("Rosca Direta", reps + 2, setsCount))
-            exercises.add(createExercise("Tríceps Corda", reps + 2, setsCount))
-        }
-        if (muscleGroups.contains("Core")) {
-            exercises.add(createExercise("Prancha Abdominal", 0, setsCount))
+
+        // Mapeamento inteligente de exercícios reais com base nos grupos musculares selecionados
+        val selectedSplits = if (muscleGroups.isEmpty()) listOf("Corpo Inteiro") else muscleGroups
+
+        selectedSplits.forEach { split ->
+            if (isCalisthenics) {
+                when (split) {
+                    "Peito" -> {
+                        exercises.add(createExercise("Parallel Bar Dip", isolationReps, setsCount, "Fundos em barras paralelas focando peitoral inferior e tríceps."))
+                        exercises.add(createExercise("Push-up", compoundReps, setsCount, "Flexões de braço clássicas com o peso do corpo."))
+                    }
+                    "Costas" -> {
+                        exercises.add(createExercise("Pull-up", compoundReps, setsCount, "Elevações na barra fixa com pega pronada focando o grande dorsal."))
+                        exercises.add(createExercise("Muscle-up", isolationReps, setsCount, "Exercício de força explosiva completo de puxada e empurre."))
+                    }
+                    "Pernas" -> {
+                        exercises.add(createExercise("Pistol Squat", compoundReps, setsCount, "Agachamento unilateral profundo desafiando força de pernas e estabilidade."))
+                    }
+                    "Bíceps" -> {
+                        exercises.add(createExercise("Pull-up", compoundReps, setsCount, "Elevações na barra fixa focando os flexores do cotovelo."))
+                    }
+                    "Tríceps" -> {
+                        exercises.add(createExercise("Parallel Bar Dip", isolationReps, setsCount, "Fundos em barras paralelas focando os tríceps."))
+                    }
+                    "Ombros" -> {
+                        exercises.add(createExercise("Handstand Push-up", compoundReps, setsCount, "Flexões em pino com apoio na parede para os ombros."))
+                    }
+                    "Core" -> {
+                        exercises.add(createExercise("L-Sit", isolationReps, setsCount, "Suporte isométrico em L elevando as pernas paralelas ao solo."))
+                        exercises.add(createExercise("Plank", 0, setsCount, "Prancha isométrica estática mantendo o alinhamento da coluna."))
+                    }
+                    "Corpo Inteiro" -> {
+                        exercises.add(createExercise("Muscle-up", compoundReps, setsCount, "Exercício calisténico completo de tração superior."))
+                        exercises.add(createExercise("Pistol Squat", compoundReps, setsCount, "Agachamento unilateral para pernas completas."))
+                        exercises.add(createExercise("Parallel Bar Dip", compoundReps, setsCount, "Fundos em barras paralelas."))
+                        exercises.add(createExercise("L-Sit", isolationReps, setsCount, "Controle de core isométrico completo."))
+                    }
+                }
+            } else {
+                when (split) {
+                    "Peito" -> {
+                        exercises.add(createExercise("Barbell Bench Press", compoundReps, setsCount, "Empurra a barra a partir do peito médio."))
+                        exercises.add(createExercise("Incline Dumbbell Press", isolationReps, setsCount, "Press inclinado com halteres para a parte superior do peito."))
+                    }
+                    "Costas" -> {
+                        exercises.add(createExercise("Lat Pulldown", compoundReps, setsCount, "Puxada na polia alta com foco nas dorsais."))
+                        exercises.add(createExercise("Barbell Row", compoundReps, setsCount, "Remada curvada com barra para espessura das costas."))
+                    }
+                    "Pernas" -> {
+                        exercises.add(createExercise("Back Squat", compoundReps, setsCount, "Agachamento livre com barra para pernas completas."))
+                        exercises.add(createExercise("Romanian Deadlift", compoundReps, setsCount, "Peso morto romeno com foco em posteriores e glúteos."))
+                        exercises.add(createExercise("Leg Extension", isolationReps, setsCount, "Extensão de pernas na máquina isolando os quadríceps."))
+                    }
+                    "Bíceps" -> {
+                        exercises.add(createExercise("Barbell Curl", isolationReps, setsCount, "Rosca direta com barra para os bíceps."))
+                        exercises.add(createExercise("Hammer Curl", isolationReps, setsCount, "Rosca martelo com halteres focando braquial e antebraços."))
+                    }
+                    "Tríceps" -> {
+                        exercises.add(createExercise("Cable Triceps Pushdown", isolationReps, setsCount, "Extensão de tríceps na polia com foco nos tríceps."))
+                    }
+                    "Ombros" -> {
+                        exercises.add(createExercise("Overhead Press", compoundReps, setsCount, "Press militar com barra de pé para os ombros."))
+                        exercises.add(createExercise("Lateral Raise", isolationReps, setsCount, "Elevações laterais com halteres para a porção lateral do ombro."))
+                    }
+                    "Core" -> {
+                        exercises.add(createExercise("Cable Crunch", isolationReps, setsCount, "Abdominais na polia alta de joelhos."))
+                        exercises.add(createExercise("Plank", 0, setsCount, "Prancha abdominal isométrica estática."))
+                    }
+                    "Corpo Inteiro" -> {
+                        exercises.add(createExercise("Back Squat", compoundReps, setsCount, "Agachamento livre focando membros inferiores."))
+                        exercises.add(createExercise("Barbell Bench Press", compoundReps, setsCount, "Supino plano com barra focando peitoral."))
+                        exercises.add(createExercise("Lat Pulldown", compoundReps, setsCount, "Puxada na polia alta focando as costas."))
+                        exercises.add(createExercise("Overhead Press", compoundReps, setsCount, "Press militar com barra focando ombros."))
+                    }
+                }
+            }
         }
 
         if (exercises.isEmpty()) {
-            exercises.add(createExercise("Exercício Adaptado", reps, setsCount))
+            if (isCalisthenics) {
+                exercises.add(createExercise("Pull-up", compoundReps, setsCount, "Exercício geral calisténico adaptado pela IA."))
+                exercises.add(createExercise("Push-up", compoundReps, setsCount, "Flexões de braço clássicas."))
+            } else {
+                exercises.add(createExercise("Barbell Bench Press", compoundReps, setsCount, "Exercício geral adaptado pela IA."))
+                exercises.add(createExercise("Back Squat", compoundReps, setsCount, "Agachamento livre adaptado."))
+            }
         }
 
         return Routine(
             id = UUID.randomUUID().toString(),
             name = name,
             focus = objTrim,
-            durationMinutes = exercises.size * 10,
+            durationMinutes = exercises.size * 12,
             exercises = exercises
         )
     }
 
-    private fun createExercise(name: String, reps: Int, setsCount: Int): Exercise {
+    private fun createExercise(name: String, reps: Int, setsCount: Int, instructions: String): Exercise {
         val sets = (1..setsCount).map {
             WorkoutSet(
                 id = UUID.randomUUID().toString(),
@@ -68,7 +150,7 @@ object AiRoutineService {
         return Exercise(
             id = UUID.randomUUID().toString(),
             name = name,
-            instructions = "Gerado por AI.",
+            instructions = instructions,
             sets = sets
         )
     }

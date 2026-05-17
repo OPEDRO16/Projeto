@@ -425,6 +425,153 @@ object ExerciseLibraryRepository {
                 "Push the floor away with forearms."
             ),
             videoUrl = "plank_demo"
+        ),
+        ExerciseLibraryItem(
+            id = "pull_up",
+            name = "Pull-up",
+            primaryMuscle = "Lats",
+            secondaryMuscles = listOf("Biceps", "Core", "Upper Back"),
+            equipment = "Bodyweight",
+            category = "Calisthenics",
+            force = ExerciseForce.PULL,
+            difficulty = ExerciseDifficulty.INTERMEDIATE,
+            instructions = listOf(
+                "Grip the bar slightly wider than shoulder width.",
+                "Hang with arms fully extended and pull shoulder blades down.",
+                "Pull chest up to the bar by driving elbows down.",
+                "Lower with control back to a dead hang."
+            ),
+            tips = listOf(
+                "Avoid using leg momentum.",
+                "Keep core tight throughout."
+            ),
+            videoUrl = "pull_up_demo"
+        ),
+        ExerciseLibraryItem(
+            id = "dip",
+            name = "Parallel Bar Dip",
+            primaryMuscle = "Chest",
+            secondaryMuscles = listOf("Triceps", "Front Delts"),
+            equipment = "Bodyweight",
+            category = "Calisthenics",
+            force = ExerciseForce.PUSH,
+            difficulty = ExerciseDifficulty.INTERMEDIATE,
+            instructions = listOf(
+                "Support body on parallel bars with arms locked.",
+                "Lower body by bending elbows, leaning slightly forward.",
+                "Descend until shoulders are slightly below elbow height.",
+                "Push back up to the starting position."
+            ),
+            tips = listOf(
+                "Do not let shoulders roll forward.",
+                "Control the descent speed."
+            ),
+            videoUrl = "dip_demo"
+        ),
+        ExerciseLibraryItem(
+            id = "push_up",
+            name = "Push-up",
+            primaryMuscle = "Chest",
+            secondaryMuscles = listOf("Triceps", "Front Delts", "Core"),
+            equipment = "Bodyweight",
+            category = "Calisthenics",
+            force = ExerciseForce.PUSH,
+            difficulty = ExerciseDifficulty.BEGINNER,
+            instructions = listOf(
+                "Start in a high plank position.",
+                "Lower body until chest almost touches the floor.",
+                "Keep elbows at a 45-degree angle to the body.",
+                "Push back up to full extension."
+            ),
+            tips = listOf(
+                "Do not let the lower back sag.",
+                "Keep neck neutral."
+            ),
+            videoUrl = "push_up_demo"
+        ),
+        ExerciseLibraryItem(
+            id = "pistol_squat",
+            name = "Pistol Squat",
+            primaryMuscle = "Quads",
+            secondaryMuscles = listOf("Glutes", "Hamstrings", "Core"),
+            equipment = "Bodyweight",
+            category = "Calisthenics",
+            force = ExerciseForce.LEGS,
+            difficulty = ExerciseDifficulty.ADVANCED,
+            instructions = listOf(
+                "Stand on one leg, extending the other leg forward.",
+                "Hinge at the hips and descend into a deep squat.",
+                "Maintain balance and upright torso.",
+                "Drive through the heel to stand back up."
+            ),
+            tips = listOf(
+                "Keep core tight for stability.",
+                "Use a wall for support if needed."
+            ),
+            videoUrl = "pistol_squat_demo"
+        ),
+        ExerciseLibraryItem(
+            id = "l_sit",
+            name = "L-Sit",
+            primaryMuscle = "Abs",
+            secondaryMuscles = listOf("Core", "Shoulders", "Hip Flexors"),
+            equipment = "Bodyweight",
+            category = "Calisthenics",
+            force = ExerciseForce.CORE,
+            difficulty = ExerciseDifficulty.INTERMEDIATE,
+            instructions = listOf(
+                "Place hands on parallettes or the floor.",
+                "Push shoulders down and lift hips off the ground.",
+                "Extend legs forward parallel to the floor.",
+                "Hold the position while breathing."
+            ),
+            tips = listOf(
+                "Depress shoulders actively.",
+                "Keep legs fully locked."
+            ),
+            videoUrl = "l_sit_demo"
+        ),
+        ExerciseLibraryItem(
+            id = "muscle_up",
+            name = "Muscle-up",
+            primaryMuscle = "Lats",
+            secondaryMuscles = listOf("Triceps", "Biceps", "Shoulders", "Chest"),
+            equipment = "Bodyweight",
+            category = "Calisthenics",
+            force = ExerciseForce.PULL,
+            difficulty = ExerciseDifficulty.ADVANCED,
+            instructions = listOf(
+                "Hang from a bar and initiate a powerful pull-up.",
+                "Pull bar toward the lower chest and transition torso forward.",
+                "Press body up until arms are fully locked out.",
+                "Lower with control back to a hang."
+            ),
+            tips = listOf(
+                "Requires both pull and push strength.",
+                "Ensure grip is secure."
+            ),
+            videoUrl = "muscle_up_demo"
+        ),
+        ExerciseLibraryItem(
+            id = "handstand_push_up",
+            name = "Handstand Push-up",
+            primaryMuscle = "Shoulders",
+            secondaryMuscles = listOf("Triceps", "Core"),
+            equipment = "Bodyweight",
+            category = "Calisthenics",
+            force = ExerciseForce.PUSH,
+            difficulty = ExerciseDifficulty.ADVANCED,
+            instructions = listOf(
+                "Kick up into a handstand against a wall.",
+                "Lower body with control until head touches the ground.",
+                "Keep core tight and elbows tucked.",
+                "Press forcefully back to start position."
+            ),
+            tips = listOf(
+                "Keep body straight.",
+                "Ensure shoulders are warm."
+            ),
+            videoUrl = "hspu_demo"
         )
     )
 
